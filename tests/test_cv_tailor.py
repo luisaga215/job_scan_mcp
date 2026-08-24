@@ -8,11 +8,13 @@ from job_scan_mcp.services.cv_tailor import (
     TailoredCV,
     TailoredJob,
     TailoredBullet,
-    generate_tailored_cv,
+    build_tailored_cv_data,
+    build_base_cv_from_profile,
     export_cv_to_pdf,
     render_preview_html,
     _safe_filename,
 )
+from job_scan_mcp.models import ParsedProfile, ProfileJob
 
 SAMPLE_JD = (
     "Senior Java Backend Engineer at Stripe. Requires 6+ years building high-throughput "
@@ -133,7 +135,7 @@ async def test_generate_tailored_cv_injects_modified_flags(mock_get_llm, test_re
     )
     mock_get_llm.return_value = _mock_structured_llm(tailored)
 
-    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    data = await build_tailored_cv_data(SAMPLE_JD, _base_cv(), test_repo)
 
     exp = data["experience"][0]
     modified = [b for b in exp["bullets"] if b["modified"]]
@@ -148,11 +150,11 @@ async def test_generate_tailored_cv_injects_modified_flags(mock_get_llm, test_re
 
 @pytest.mark.asyncio
 @patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
-async def test_generate_tailored_cv_requires_inputs(mock_get_llm, test_repo):
+async def test_build_tailored_cv_data_requires_inputs(mock_get_llm, test_repo):
     with pytest.raises(ValueError, match="job_description_text"):
-        await generate_tailored_cv("", _base_cv(), test_repo)
+        await build_tailored_cv_data("", _base_cv(), test_repo)
     with pytest.raises(ValueError, match="base_cv_json"):
-        await generate_tailored_cv(SAMPLE_JD, {}, test_repo)
+        await build_tailored_cv_data(SAMPLE_JD, {}, test_repo)
 
 
 @pytest.mark.asyncio
@@ -162,7 +164,7 @@ async def test_generate_tailored_cv_prompt_enforces_recruiter_standards(mock_get
     mock_llm = _mock_structured_llm(tailored)
     mock_get_llm.return_value = mock_llm
 
-    await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    await build_tailored_cv_data(SAMPLE_JD, _base_cv(), test_repo)
     prompt = mock_llm.last_prompt
 
     for required in [
@@ -208,6 +210,31 @@ def test_safe_filename():
     assert _safe_filename("") == "tailored-cv"
 
 
+def test_build_base_cv_from_profile():
+    profile = ParsedProfile(
+        name="Luis Angel Gonzalez",
+        email="luis@example.com",
+        skills=["Java", "AWS"],
+        core_stack=["Java", "Spring Boot"],
+        summary="Backend engineer",
+        education=["M.S. AI"],
+        experience=[
+            ProfileJob(title="SysDev II", company="Amazon", date="Sep 2025 - Present",
+                       location="Mexico City", bullets=["Designed canary deployments.", "Cross-region replication."]),
+        ],
+    )
+    base = build_base_cv_from_profile(profile)
+    assert base["name"] == "Luis Angel Gonzalez"
+    assert "luis@example.com" in base["contact"]
+    assert base["experience"][0]["company"] == "Amazon"
+    assert len(base["experience"][0]["bullets"]) == 2
+    assert base["skills"]["Technical"] == ["Java", "AWS"]
+
+
+def test_build_base_cv_from_profile_none():
+    assert build_base_cv_from_profile(None) == {}
+
+
 def test_pdf_template_renders_bullet_dicts_and_strings():
     from jinja2 import Template
     html = Template(cv_tailor.PDF_TEMPLATE).render(cv={
@@ -238,7 +265,7 @@ async def test_render_preview_embeds_modified_flags(mock_get_llm, test_repo, tmp
         ])],
     )
     mock_get_llm.return_value = _mock_structured_llm(tailored)
-    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    data = await build_tailored_cv_data(SAMPLE_JD, _base_cv(), test_repo)
 
     preview = render_preview_html(data, preview_path=tmp_path / "preview.html")
     html = preview.read_text(encoding="utf-8")
@@ -265,7 +292,7 @@ async def test_full_flow_generate_preview_export(mock_get_llm, mock_pw, test_rep
     mock_get_llm.return_value = _mock_structured_llm(tailored)
     mock_pw.return_value = _mock_playwright()
 
-    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    data = await build_tailored_cv_data(SAMPLE_JD, _base_cv(), test_repo)
     preview = render_preview_html(data, preview_path=tmp_path / "cv_preview.html")
     assert preview.exists()
 

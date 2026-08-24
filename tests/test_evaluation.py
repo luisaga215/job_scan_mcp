@@ -1,7 +1,8 @@
 import pytest
 from unittest.mock import patch
 
-from job_scan_mcp.models import Job, UserProfile, ParsedProfile, DeepEvaluationResult
+from job_scan_mcp.models import Job, UserProfile, ParsedProfile, ProfileJob, DeepEvaluationResult
+from job_scan_mcp.services.cv_tailor import TailoredCV, TailoredJob, TailoredBullet
 from job_scan_mcp.services.evaluation import (
     run_deep_evaluation_batch
 )
@@ -168,3 +169,72 @@ async def test_run_deep_evaluation_partial_time_budget(mock_get_llm, test_repo):
     assert result["partial"] is True
     assert result["evaluated_count"] == 5
     assert result["pending_remaining"] == 1
+
+
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.evaluation.get_llm_for_stage")
+async def test_deep_evaluation_generates_and_persists_tailored_cv(mock_get_llm, test_repo):
+    """Integration: a RELEVANT job evaluated with a structured profile gets a tailored_cv_json persisted."""
+    profile = ParsedProfile(
+        name="John Doe",
+        skills=["Python", "AWS"],
+        core_stack=["Python", "AWS"],
+        experience_years=5.0,
+        seniority_level="Mid",
+        summary="Mid Python Developer",
+        experience=[ProfileJob(title="Backend", company="Co", date="2024 - Present", location="Remote",
+                               bullets=["Built Python services.", "Managed AWS infra."])],
+    )
+    await test_repo.save_user_profile("Raw cv text", profile)
+
+    job = Job(
+        id="cv_eval_job_1",
+        title="Python Backend Engineer",
+        company="Stripe",
+        location="Remote",
+        description="Python + AWS microservices",
+        job_url="http://stripe.com/cv",
+        state="RELEVANT"
+    )
+    await test_repo.save_job(job)
+
+    mock_metrics = DeepEvaluationResult(
+        fit_score=90,
+        interview_probability=80,
+        core_stack_overlap=["Python", "AWS"],
+        true_seniority_alignment="Matches.",
+        red_flags=[],
+        application_friction="Low",
+        pros=["Great fit"],
+        cons=[]
+    )
+    tailored_cv = TailoredCV(
+        name="John Doe",
+        contact=["john@example.com"],
+        summary="Python backend engineer.",
+        experience=[TailoredJob(title="Backend", company="Co", date="2024 - Present", location="Remote", bullets=[
+            TailoredBullet(text="Built high-throughput Python services on AWS.", modified=True, match_reason="JD requires AWS"),
+        ])],
+    )
+
+    class SchemaAwareLLM:
+        def with_structured_output(self, schema):
+            self._schema = schema
+            return self
+
+        async def ainvoke(self, prompt, *args, **kwargs):
+            if self._schema is DeepEvaluationResult:
+                return mock_metrics
+            return tailored_cv
+
+    mock_get_llm.return_value = SchemaAwareLLM()
+
+    result = await run_deep_evaluation_batch(batch_size=5, repo=test_repo)
+
+    assert result["evaluated_count"] == 1
+    assert result["tailored_cv_generated"] == 1
+
+    db_job = await test_repo.get_job("cv_eval_job_1")
+    assert db_job.state == "EVALUATED"
+    assert db_job.tailored_cv_json is not None
+    assert '"modified": true' in db_job.tailored_cv_json or "modified" in db_job.tailored_cv_json

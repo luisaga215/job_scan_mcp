@@ -88,6 +88,7 @@ class JobRepository:
             existing.visa_keywords = job.visa_keywords
             existing.application_status = job.application_status
             existing.application_status_updated_at = job.application_status_updated_at
+            existing.tailored_cv_json = job.tailored_cv_json
             existing.fit_score = job.fit_score
             existing.interview_probability = job.interview_probability
             existing.core_stack_overlap_json = job.core_stack_overlap_json

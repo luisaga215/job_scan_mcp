@@ -7,6 +7,7 @@ Two-stage architecture:
     template (Playwright) and exports it to PDF.
 """
 import asyncio
+import json
 import logging
 import re
 from datetime import datetime
@@ -22,6 +23,35 @@ from job_scan_mcp.repository import JobRepository
 from job_scan_mcp.services.llm_factory import get_llm_for_stage
 
 logger = logging.getLogger(__name__)
+
+
+def build_base_cv_from_profile(profile) -> dict:
+    """Convert a ParsedProfile into the base CV JSON shape used by the tailoring engine."""
+    if profile is None:
+        return {}
+    contact = []
+    if profile.email:
+        contact.append(profile.email)
+    return {
+        "name": profile.name or "",
+        "contact": contact,
+        "summary": profile.summary or "",
+        "experience": [
+            {
+                "title": job.title,
+                "company": job.company,
+                "date": job.date,
+                "location": job.location,
+                "bullets": list(job.bullets),
+            }
+            for job in (profile.experience or [])
+        ],
+        "education": [
+            {"degree": edu, "institution": "", "year": ""}
+            for edu in (profile.education or [])
+        ],
+        "skills": {"Technical": list(profile.skills or []), "Core Stack": list(profile.core_stack or [])},
+    }
 
 
 # =====================================================================
@@ -57,21 +87,28 @@ class TailoredCV(BaseModel):
 
 
 # =====================================================================
-# Tool A: LLM inference / adaptation
+# Tool A: LLM inference / adaptation (reusable by the MCP tool and the pipeline)
 # =====================================================================
-async def generate_tailored_cv(job_description_text: str, base_cv_json: dict, repo: JobRepository) -> dict:
+async def build_tailored_cv_data(
+    job_description_text: str,
+    base_cv_json: dict,
+    repo: JobRepository,
+    llm: Any = None,
+) -> dict:
     """Analyze the JD and rewrite the base CV to maximize alignment.
 
-    Returns the tailored CV as a JSON structure where every modified node has
-    ``modified: true`` and a ``match_reason``. Experience is never invented;
-    it is only reframed, reordered and emphasized.
+    Shared by the standalone `generate_tailored_cv` MCP tool and the background
+    generation inside deep evaluation. Returns the tailored CV JSON where every
+    modified bullet has ``modified: true`` and a ``match_reason``. Experience is
+    never invented; it is only reframed, reordered and emphasized.
     """
     if not job_description_text or not job_description_text.strip():
         raise ValueError("job_description_text cannot be empty.")
     if not base_cv_json:
         raise ValueError("base_cv_json cannot be empty.")
 
-    llm = await get_llm_for_stage("deep_evaluation", repo)
+    if llm is None:
+        llm = await get_llm_for_stage("deep_evaluation", repo)
     structured_llm = llm.with_structured_output(TailoredCV)
 
     import json as _json

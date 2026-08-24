@@ -61,6 +61,39 @@
             background: #6366f1;
             color: #fff;
         }
+
+        /* Inline CV paper preview (ATS look) */
+        .paper { background: #fff; color: #111; font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; }
+        .paper h1 { font-size: 20pt; text-align: center; margin-bottom: 4px; font-weight: normal; }
+        .paper .contact-info { text-align: center; font-size: 9.5pt; margin-bottom: 15px; color: #333; }
+        .paper .section-title { font-size: 12pt; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 14px; margin-bottom: 8px; font-weight: bold; }
+        .paper .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px; }
+        .paper .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 4px; font-size: 10pt; }
+        .paper ul { margin-top: 0; padding-left: 20px; margin-bottom: 12px; }
+        .paper li { margin-bottom: 3px; font-size: 10.5pt; line-height: 1.3; }
+        .paper .summary { margin-bottom: 12px; font-size: 10pt; }
+        .paper .skill-row { margin-bottom: 4px; font-size: 10pt; }
+        .paper .bold { font-weight: bold; }
+        .bullet { position: relative; border-radius: 3px; transition: background .15s; }
+        .bullet.highlighted { background: #fef3c7; box-shadow: inset 2px 0 0 #f59e0b; }
+        .bullet .tooltip {
+            position: absolute; left: 0; right: auto; bottom: calc(100% + 6px); z-index: 20;
+            display: none; width: max-content; max-width: 300px; background: #1e293b; color: #e2e8f0;
+            font-size: 10.5px; line-height: 1.35; padding: 6px 8px; border-radius: 6px;
+            border: 1px solid #475569; box-shadow: 0 6px 16px rgba(0,0,0,.25);
+        }
+        .bullet.highlighted:hover .tooltip { display: block; }
+
+        /* Print: only the CV paper is printed (browser "Save as PDF") */
+        @page { size: Letter; margin: 0.5in; }
+        @media print {
+            body * { visibility: hidden !important; }
+            #cvPrintArea, #cvPrintArea * { visibility: visible !important; }
+            #cvPrintArea {
+                position: absolute !important; left: 0; top: 0; width: 100%;
+                box-shadow: none !important; border: none !important;
+            }
+        }
     </style>
 </head>
 <body class="h-full flex flex-col font-sans antialiased overflow-x-hidden selection:bg-indigo-500 selection:text-white">
@@ -443,6 +476,10 @@
                                             <span class="inline-flex items-center gap-1.5"><span class="text-slate-500 uppercase font-bold tracking-wider">Visa</span><span x-text="job.visa_keywords || 'No signals'"></span></span>
                                         </div>
                                         <div class="flex items-center gap-2">
+                                            <button @click.stop="openCvPanel(job)" title="Preview the tailored CV for this job (offline)"
+                                                    class="bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-300 font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition">
+                                                <i data-lucide="file-text" class="w-3.5 h-3.5"></i> View Adapted CV
+                                            </button>
                                             <button @click.stop="quickApply(job)" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition">
                                                 <i data-lucide="copy" class="w-3.5 h-3.5"></i> Quick Apply
                                             </button>
@@ -687,6 +724,109 @@
             </div>
         </aside>
 
+        <!-- ============ CV TAILORING MODAL (offline preview) ============ -->
+        <div x-show="cvPanelJob" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeCvPanel()">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
+
+                <!-- Header -->
+                <div class="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
+                    <div>
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="file-text" class="w-4 h-4 text-amber-300"></i> Adapted CV
+                        </h2>
+                        <template x-if="cvPanelJob">
+                            <p class="text-xs text-slate-400 mt-0.5" x-text="cvPanelJob.company + ' — ' + cvPanelJob.title"></p>
+                        </template>
+                    </div>
+                    <button @click="closeCvPanel()" class="text-slate-400 hover:text-white transition">
+                        <i data-lucide="x" class="w-5 h-5"></i>
+                    </button>
+                </div>
+
+                <!-- Body -->
+                <div class="overflow-y-auto overscroll-contain p-5 flex flex-col gap-4">
+
+                    <!-- ===== Already tailored: ATS preview with highlights ===== -->
+                    <div x-show="cvPanelJob && cvPanelJob.tailored_cv" class="flex flex-col gap-4">
+                        <div class="flex flex-wrap items-center justify-between gap-2">
+                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+                                <span>Show highlights</span>
+                                <button type="button" @click="cvShowHighlights = !cvShowHighlights"
+                                        class="relative inline-flex h-5 w-9 items-center rounded-full transition"
+                                        :class="cvShowHighlights ? 'bg-amber-500' : 'bg-slate-700'">
+                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
+                                          :class="cvShowHighlights ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                                </button>
+                            </label>
+                            <span class="text-xs text-slate-500"><span x-text="cvModifiedCount()"></span> / <span x-text="cvTotalBullets()"></span> bullets modified</span>
+                        </div>
+
+                        <div class="flex flex-wrap items-center gap-2">
+                            <button @click="cvPrintPdf()" title="Print / Save as PDF (works offline, no MCP needed)"
+                                    class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5">
+                                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Download PDF
+                            </button>
+                            <button @click="cvDownloadJson()" class="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-2 rounded-lg transition">JSON</button>
+                            <button @click="cvDownloadCleanHtml()" class="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-2 rounded-lg transition">HTML</button>
+                        </div>
+
+                        <div id="cvPrintArea" class="paper bg-white shadow-xl rounded-sm p-8 text-left">
+                            <h1 x-text="cvPanelJob.tailored_cv.name || ''"></h1>
+                            <div class="contact-info" x-text="(cvPanelJob.tailored_cv.contact || []).join('  |  ')"></div>
+                            <div class="summary" x-text="cvPanelJob.tailored_cv.summary || ''"></div>
+
+                            <div class="section-title">Experience</div>
+                            <template x-for="(job, ji) in (cvPanelJob.tailored_cv.experience || [])" :key="ji">
+                                <div>
+                                    <div class="item-header"><span x-text="job.title"></span><span x-text="job.date"></span></div>
+                                    <div class="item-subheader"><span x-text="job.company"></span><span x-text="job.location"></span></div>
+                                    <ul>
+                                        <template x-for="(b, bi) in (job.bullets || [])" :key="bi">
+                                            <li class="bullet" :class="cvBulletCls(b)">
+                                                <span x-text="b.text"></span>
+                                                <span x-show="cvShowHighlights && b.modified && b.match_reason" class="tooltip" x-text="b.match_reason"></span>
+                                            </li>
+                                        </template>
+                                    </ul>
+                                </div>
+                            </template>
+
+                            <template x-if="(cvPanelJob.tailored_cv.education || []).length">
+                                <div>
+                                    <div class="section-title">Education</div>
+                                    <template x-for="(edu, ei) in cvPanelJob.tailored_cv.education" :key="ei">
+                                        <div>
+                                            <div class="item-header"><span x-text="edu.degree"></span><span x-text="edu.year"></span></div>
+                                            <div class="item-subheader"><span x-text="edu.institution"></span><span></span></div>
+                                        </div>
+                                    </template>
+                                </div>
+                            </template>
+
+                            <template x-if="Object.keys(cvPanelJob.tailored_cv.skills || {}).length">
+                                <div>
+                                    <div class="section-title">Skills</div>
+                                    <template x-for="(items, group) in cvPanelJob.tailored_cv.skills" :key="group">
+                                        <div class="skill-row"><span class="bold" x-text="group + ':'"></span><span x-text="' ' + (items || []).join(', ')"></span></div>
+                                    </template>
+                                </div>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- ===== Not generated yet: request state ===== -->
+                    <div x-show="cvPanelJob && !cvPanelJob.tailored_cv" class="flex flex-col gap-4 text-sm text-slate-400">
+                        <p>No adapted CV generated for this job yet.</p>
+                        <p class="text-xs text-slate-500">This report is a static file, so generation runs through the assistant (MCP tool <code class="text-indigo-300">generate_tailored_cv</code>) or automatically during deep evaluation. Ask the assistant, then regenerate the report to preview it here.</p>
+                        <button @click="cvCopyRequest()" class="self-start bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-300 text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5">
+                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy request for assistant
+                        </button>
+                        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3 max-h-40 overflow-y-auto overscroll-contain text-xs text-slate-500 whitespace-pre-line" x-text="cvPanelJob.description"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <!-- ============ CONFIRM ARCHIVE / RESTORE MODAL ============ -->
         <div x-show="pendingAction" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="cancelAction()">
             <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-4">
@@ -755,6 +895,8 @@
                 appliedStatus: 'all',
                 showReports: false,
                 pendingAction: null,
+                cvPanelJob: null,
+                cvShowHighlights: true,
                 reportsManifest: window.reportsManifest || [],
                 currentReport: window.currentReport || {},
                 themeMode: 'system',
@@ -961,6 +1103,48 @@
                             : 'Restore requested. Run the MCP tool restore_report (copied to clipboard).');
                 },
 
+                /* ---------- inline CV tailoring panel ---------- */
+                openCvPanel(job) {
+                    this.cvPanelJob = job;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                closeCvPanel() { this.cvPanelJob = null; },
+                cvPrintPdf() { window.print(); },
+                cvModifiedCount() {
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return 0;
+                    return (cv.experience || []).reduce((s, j) => s + (j.bullets || []).filter(b => b.modified).length, 0);
+                },
+                cvTotalBullets() {
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return 0;
+                    return (cv.experience || []).reduce((s, j) => s + (j.bullets || []).length, 0);
+                },
+                cvBulletCls(b) {
+                    return this.cvShowHighlights && b.modified ? 'highlighted' : '';
+                },
+                cvDownloadJson() {
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return;
+                    this.download('tailored_cv.json', JSON.stringify(cv, null, 2), 'application/json');
+                },
+                cvDownloadCleanHtml() {
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return;
+                    this.download('tailored_cv.html', this.buildCleanHtml(cv), 'text/html;charset=utf-8');
+                },
+                cvCopyRequest() {
+                    const job = this.cvPanelJob;
+                    if (!job) return;
+                    const text = [
+                        `Run generate_tailored_cv for "${job.title}" @ ${job.company} (job_id: ${job.id}).`,
+                        'Job description:\n' + (job.description || ''),
+                        'Use the candidate profile CV as base_cv_json.',
+                    ].join('\n\n');
+                    this.copyText(text);
+                    this.$dispatch('toast', 'Request copied — ask the assistant to run generate_tailored_cv, then regenerate the report.');
+                },
+
                 /* ---------- applied view ---------- */                get appliedCounts() {
                     const c = { apply: 0, applied: 0, interview: 0, rejected: 0 };
                     this.jobs.forEach(j => { const s = this.appStates[j.id] || 'apply'; if (s in c) c[s] += 1; });
@@ -1082,6 +1266,39 @@
                 },
 
                 /* ---------- export ---------- */
+                buildCleanHtml(cv) {
+                    const esc = s => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+                    const bullets = (job) => (job.bullets || []).map(b => `<li>${esc(b.text || '')}</li>`).join('');
+                    const exp = (cv.experience || []).map(job => `
+                        <div>
+                            <div class="item-header"><span>${esc(job.title)}</span><span>${esc(job.date)}</span></div>
+                            <div class="item-subheader"><span>${esc(job.company)}</span><span>${esc(job.location)}</span></div>
+                            <ul>${bullets(job)}</ul>
+                        </div>`).join('');
+                    const edu = (cv.education || []).map(e => `
+                        <div><div class="item-header"><span>${esc(e.degree)}</span><span>${esc(e.year)}</span></div>
+                        <div class="item-subheader"><span>${esc(e.institution)}</span><span></span></div></div>`).join('');
+                    const skills = Object.entries(cv.skills || {}).map(([g, items]) =>
+                        `<div class="skill-row"><span class="bold">${esc(g)}:</span> ${esc((items || []).join(', '))}</div>`).join('');
+                    return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
+@page{margin:0.5in}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111;line-height:1.3;font-size:10.5pt}
+h1{font-size:20pt;text-align:center;margin-bottom:4px;font-weight:normal}
+.contact-info{text-align:center;font-size:9.5pt;margin-bottom:15px;color:#333}
+.section-title{font-size:12pt;text-transform:uppercase;border-bottom:1px solid #000;margin-top:12px;margin-bottom:8px;font-weight:bold}
+.item-header{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:2px}
+.item-subheader{display:flex;justify-content:space-between;font-style:italic;margin-bottom:4px;font-size:10pt}
+ul{margin-top:0;padding-left:20px;margin-bottom:12px}li{margin-bottom:3px}
+.summary{margin-bottom:12px;font-size:10pt}.skill-row{margin-bottom:4px;font-size:10pt}.bold{font-weight:bold}
+</style></head><body>
+<h1>${esc(cv.name)}</h1>
+<div class="contact-info">${esc((cv.contact || []).join(' | '))}</div>
+<div class="summary">${esc(cv.summary)}</div>
+<div class="section-title">Experience</div>${exp}
+${edu ? '<div class="section-title">Education</div>' + edu : ''}
+${skills ? '<div class="section-title">Skills</div>' + skills : ''}
+</body></html>`;
+                },
                 exportCsv() {
                     const headers = ['Company', 'Title', 'Location', 'State', 'Fit', 'Prob', 'Salary', 'Posted', 'Sponsorship', 'Relocation', 'Friction', 'RedFlags', 'URL'];
                     const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';

@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 import time
 from datetime import datetime
@@ -8,6 +9,7 @@ from langgraph.graph import StateGraph, END
 from job_scan_mcp.models import Job, DeepEvaluationResult
 from job_scan_mcp.repository import JobRepository
 from job_scan_mcp.services.llm_factory import get_llm_for_stage
+from job_scan_mcp.services.cv_tailor import build_tailored_cv_data, build_base_cv_from_profile
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,7 @@ async def run_deep_evaluation_batch(
         raise ValueError("No user profile found. Please sync your CV first using the sync_cv tool.")
         
     profile_dict = user_profile.profile.model_dump()
+    base_cv = build_base_cv_from_profile(user_profile.profile)
     
     # 2. Fetch relevant jobs
     jobs = await repo.get_jobs_by_state("RELEVANT", limit=batch_size)
@@ -255,6 +258,7 @@ async def run_deep_evaluation_batch(
     
     results: List[Dict[str, Any]] = []
     partial = False
+    tailored_cv_generated = 0
     
     # 5. Process in native chunks, checking the time budget between waves
     for i in range(0, len(jobs), EVALUATION_CHUNK_SIZE):
@@ -270,6 +274,7 @@ async def run_deep_evaluation_batch(
         ]
         chunk_results = await asyncio.gather(*tasks)
         # Persist sequentially to avoid concurrent flushes on the shared session
+        evaluated_db_jobs = []
         for r in chunk_results:
             if not r.get("errors") and r.get("metrics"):
                 db_job = await repo.get_job(r["id"])
@@ -288,7 +293,21 @@ async def run_deep_evaluation_batch(
                 db_job.cons = metrics.get("cons", [])
                 db_job.evaluated_at = datetime.utcnow()
                 await repo.save_job(db_job)
+                evaluated_db_jobs.append(db_job)
         results.extend(chunk_results)
+
+        # Background CV tailoring: generate + persist tailored CV for evaluated jobs
+        # that don't have one yet (RELEVANT -> EVALUATED flow).
+        cv_candidates = [j for j in evaluated_db_jobs if not j.tailored_cv_json and base_cv.get("experience")]
+        if cv_candidates:
+            cv_outputs = await asyncio.gather(*[
+                build_tailored_cv_data(job.description, base_cv, repo, llm)
+                for job in cv_candidates
+            ])
+            for job, cv in zip(cv_candidates, cv_outputs):
+                job.tailored_cv_json = json.dumps(cv, ensure_ascii=False)
+                await repo.save_job(job)
+            tailored_cv_generated += len(cv_outputs)
         
         # Stop early if we still have jobs left and the time budget is exhausted
         if i + EVALUATION_CHUNK_SIZE < len(jobs) and (time.monotonic() - started_at) >= budget:
@@ -312,6 +331,7 @@ async def run_deep_evaluation_batch(
         "message": "Partial deep evaluation completed within the time budget; call again to continue." if partial else "Deep evaluation completed.",
         "evaluated_count": evaluated_count,
         "average_fit_score": round(avg_fit, 2),
+        "tailored_cv_generated": tailored_cv_generated,
         "pending_remaining": max(0, total_relevant - evaluated_count),
         "partial": partial,
         "time_budget_seconds": budget,

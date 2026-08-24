@@ -71,9 +71,15 @@ The default models can be overridden at runtime with the `configure_llm` tool.
 | `set_job_application_status(job_id, status)` | Persist kanban state: `apply` / `applied` / `interview` / `rejected` |
 | `generate_html_report()` | Render the interactive dashboard + snapshot history |
 | `archive_report(file)` / `restore_report(file)` | Soft-delete a report snapshot (moves to `reports/archive/`) |
-| `generate_tailored_cv(job_description_text, base_cv_json)` | Rewrite a CV for a JD, flagging changes with `modified` + `match_reason` |
+| `generate_tailored_cv(job_id)` | Tailor the candidate CV for a job on demand (persists `tailored_cv_json`) |
 | `export_cv_to_pdf(tailored_cv_data, file_name)` | Render the tailored CV to an ATS-friendly PDF (Playwright) |
 | `configure_llm(stage, provider, model, base_url)` | Override the model per pipeline stage |
+
+> **CV Tailoring pipeline:** during deep evaluation, every evaluated job automatically gets a
+> tailored CV (`tailored_cv_json` column) using the same engine as `generate_tailored_cv`. The
+> HTML report embeds it, and the per-vacancy **"View Adapted CV"** modal previews it offline
+> (highlighted changes with `match_reason`) and exports PDF via `window.print()` — no MCP
+> round-trip needed at download time.
 
 ### Typical workflow
 

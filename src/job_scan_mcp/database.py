@@ -40,6 +40,7 @@ class DatabaseManager:
             "visa_keywords": "VARCHAR",
             "application_status": "VARCHAR",
             "application_status_updated_at": "DATETIME",
+            "tailored_cv_json": "TEXT",
         }
         for column, ctype in wanted.items():
             if column not in existing:

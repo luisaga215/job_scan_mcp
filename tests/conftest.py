@@ -23,6 +23,13 @@ def _isolate_reports_dir(tmp_path, monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _isolate_cv_tailor_data(tmp_path, monkeypatch):
+    """Keep CV tailoring results/exports away from the real data directory."""
+    from job_scan_mcp.services import cv_tailor
+    monkeypatch.setattr(cv_tailor.config, "DATA_DIR", tmp_path / "data")
+
+
+@pytest.fixture(autouse=True)
 def _no_real_llm_for_report_summaries(monkeypatch):
     """Reports generate an AI summary; avoid real API calls in tests."""
 

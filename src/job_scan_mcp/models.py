@@ -8,6 +8,14 @@ from sqlmodel import Field, SQLModel
 # Pydantic Schemas for JSON Structured Outputs & API payloads
 # =====================================================================
 
+class ProfileJob(BaseModel):
+    title: str = PydanticField("", description="Job title")
+    company: str = PydanticField("", description="Employer name")
+    date: str = PydanticField("", description="Employment period, e.g. 'Sep 2025 - Present'")
+    location: str = PydanticField("", description="Work location")
+    bullets: List[str] = PydanticField(default_factory=list, description="Achievement bullets for the role")
+
+
 class ParsedProfile(BaseModel):
     name: Optional[str] = PydanticField(None, description="The candidate's full name")
     email: Optional[str] = PydanticField(None, description="The candidate's email address")
@@ -16,6 +24,7 @@ class ParsedProfile(BaseModel):
     experience_years: float = PydanticField(0.0, description="Total years of professional software engineering experience")
     seniority_level: str = PydanticField("Mid", description="Estimated seniority level (e.g., Junior, Mid, Senior, Lead, Principal, Staff)")
     education: List[str] = PydanticField(default_factory=list, description="Degrees, universities, or notable certifications")
+    experience: List[ProfileJob] = PydanticField(default_factory=list, description="Structured work experience entries with bullets")
     summary: str = PydanticField("", description="A short professional summary of the candidate's technical profile")
 
 
@@ -93,6 +102,9 @@ class Job(SQLModel, table=True):
     # User-managed application status (apply | applied | interview | rejected)
     application_status: Optional[str] = Field(default=None, index=True, description="User-managed application state for the kanban workflow")
     application_status_updated_at: Optional[datetime] = Field(default=None, description="When the user last updated the application status")
+
+    # Tailored CV produced automatically during deep evaluation (or on demand)
+    tailored_cv_json: Optional[str] = Field(default=None, description="JSON string of the CV tailored to this job")
     
     # State Flow: PENDING_SCREENING -> RELEVANT / REJECTED -> EVALUATED
     state: str = Field(default="PENDING_SCREENING", index=True)

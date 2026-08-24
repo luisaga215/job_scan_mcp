@@ -261,29 +261,45 @@ async def restore_report(file: str) -> Dict[str, Any]:
 
 @mcp.tool()
 @handle_mcp_errors
-async def generate_tailored_cv(job_description_text: str, base_cv_json: dict) -> Dict[str, Any]:
-    """Analyze a job description and rewrite the base CV to maximize alignment (Dynamic CV Tailoring).
+async def generate_tailored_cv(job_id: str) -> Dict[str, Any]:
+    """Tailor the candidate CV for a specific job on demand and persist it on the job record.
 
-    Returns a JSON CV where every modified bullet carries {'modified': true, 'match_reason': '...'},
-    and writes a self-contained preview HTML with the highlight engine for review.
+    Uses the shared build_tailored_cv_data engine (same as the deep-evaluation pipeline).
+    The tailored CV JSON is stored in the job's tailored_cv_json column and appears in the
+    report's "View Adapted CV" modal after regeneration.
 
     Args:
-        job_description_text: The full job description text.
-        base_cv_json: The candidate's base CV as a JSON structure (name, contact, summary, experience, education, skills).
+        job_id: The deterministic job id (SHA-256 hash) shown in the HTML report.
     """
     await ensure_db()
+    import json as _json
     from job_scan_mcp.services import cv_tailor
     async with db_manager.session() as session:
         repo = JobRepository(session)
-        tailored = await cv_tailor.generate_tailored_cv(job_description_text, base_cv_json, repo)
-        preview = cv_tailor.render_preview_html(tailored)
+        job = await repo.get_job(job_id)
+        if job is None:
+            return {"status": "error", "message": f"No job found with id '{job_id}'."}
+
+        profile_record = await repo.get_user_profile()
+        base_cv = cv_tailor.build_base_cv_from_profile(profile_record.profile if profile_record else None)
+        if not base_cv.get("experience"):
+            return {
+                "status": "error",
+                "message": "The candidate profile has no structured work experience. Re-run sync_cv so the CV is parsed with experience bullets.",
+            }
+
+        tailored = await cv_tailor.build_tailored_cv_data(job.description, base_cv, repo)
+        job.tailored_cv_json = _json.dumps(tailored, ensure_ascii=False)
+        await repo.save_job(job)
+
         return {
             "status": "success",
             "data": {
+                "job_id": job.id,
                 "tailored_cv": tailored,
                 "modified_bullets": tailored.get("_meta", {}).get("modified_bullets", 0),
                 "total_bullets": tailored.get("_meta", {}).get("total_bullets", 0),
-                "preview_html": preview.as_uri(),
+                "stored_on_job": True,
             }
         }
 

@@ -307,6 +307,32 @@ def test_replace_manifest_in_html_handles_nested_arrays():
     assert out == 'window.reportsManifest = [{"file": "b.html"}];'
 
 
+@pytest.mark.asyncio
+async def test_report_embeds_tailored_cv(test_repo, tmp_path, monkeypatch):
+    """A tailored CV persisted on the job flows into the report payload for offline preview."""
+    monkeypatch.setattr("job_scan_mcp.services.report.REPORTS_DIR", tmp_path)
+
+    job = Job(
+        id="cv_embed_1",
+        title="Senior Backend Engineer",
+        company="Stripe",
+        location="Remote",
+        description="Java + AWS microservices",
+        job_url="http://stripe.com/cv",
+        state="EVALUATED",
+        fit_score=90,
+        tailored_cv_json=json.dumps({"name": "Luis Tailored", "summary": "AWS microservices expert.", "experience": []}),
+    )
+    await test_repo.save_job(job)
+
+    uri = await generate_report(test_repo)
+    html = Path(uri.replace("file:///", "")).read_text(encoding="utf-8")
+
+    assert "tailored_cv" in html
+    assert "Luis Tailored" in html
+    assert "View Adapted CV" in html  # the per-vacancy button exists
+
+
 def test_clean_ai_summary_strips_markdown():
     raw = (
         "- **Dominant role types:** Security platform engineering\n"
