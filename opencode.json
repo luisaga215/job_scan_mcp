@@ -1,0 +1,17 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "mcp": {
+    "job-scan-mcp": {
+      "type": "local",
+      "command": [
+        "C:/Projects/job_scan_mcp/.venv/Scripts/python.exe",
+        "-m",
+        "job_scan_mcp.mcp_server"
+      ],
+      "enabled": true
+    }
+  },
+  "experimental": {
+    "mcp_timeout": 600000
+  }
+}

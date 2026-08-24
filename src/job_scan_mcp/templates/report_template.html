@@ -1,0 +1,1183 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full bg-slate-950 text-slate-100">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Job Evaluator Dashboard</title>
+
+    <!-- Google Fonts: Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                }
+            }
+        }
+    </script>
+
+    <!-- Lucide Icons CDN -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+
+    <!-- Alpine.js CDN -->
+    <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+
+    <style>
+        [x-cloak] { display: none !important; }
+        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        ::-webkit-scrollbar-track { background: #090d16; }
+        ::-webkit-scrollbar-thumb { background: #1e293b; border-radius: 4px; }
+        ::-webkit-scrollbar-thumb:hover { background: #334155; }
+        .chip {
+            display: inline-flex;
+            align-items: center;
+            padding: 2px 8px;
+            border-radius: 6px;
+            font-size: 11px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            white-space: nowrap;
+        }
+        /* Light theme (invert dark palette) */
+        html.theme-light {
+            filter: invert(0.88) hue-rotate(180deg);
+            color-scheme: dark; /* native form controls render dark => look light after inversion */
+        }
+        html.theme-light input[type="checkbox"],
+        html.theme-light input[type="radio"] {
+            accent-color: #282b94; /* counter-inverted so it reads as indigo after the filter */
+        }
+        html.theme-light ::selection {
+            background: #6366f1;
+            color: #fff;
+        }
+    </style>
+</head>
+<body class="h-full flex flex-col font-sans antialiased overflow-x-hidden selection:bg-indigo-500 selection:text-white">
+
+    <div class="max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col gap-8" x-data="jobScreeningApp()">
+
+        <!-- Header -->
+        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
+            <div>
+                <h1 class="text-2xl font-bold tracking-tight text-white">
+                    Job Evaluator Dashboard
+                </h1>
+                <p class="text-slate-400 text-sm mt-0.5">Evaluated vacancies, ranked by fit.</p>
+            </div>
+            <div class="flex items-center gap-3 text-right text-slate-400 text-xs md:text-sm self-start md:self-auto">
+                <span class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 inline-block">
+                    Last Compiled: <span class="text-indigo-400 font-semibold">{{ generated_at }}</span>
+                </span>
+                <!-- Reports history -->
+                <button @click="showReports = !showReports" title="Report history"
+                        class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 transition">
+                    <i data-lucide="history" class="w-4 h-4"></i>
+                    <span class="font-semibold">Reports</span>
+                    <span class="bg-indigo-600/30 text-indigo-300 text-[10px] font-bold rounded px-1.5 py-0.5" x-text="reportsManifest.length"></span>
+                </button>
+                <!-- Theme switch: light / dark / system -->
+                <div class="flex items-center gap-1 bg-slate-900 border border-slate-800 rounded-lg p-1" role="group" aria-label="Theme">
+                    <button @click="setTheme('light')" title="Light theme"
+                            :class="themeMode === 'light' ? 'bg-indigo-600/30 text-amber-300 border-indigo-500' : 'text-slate-500 hover:text-slate-200 border-transparent'"
+                            class="p-1.5 border rounded-md transition flex items-center">
+                        <i data-lucide="sun" class="w-4 h-4"></i>
+                    </button>
+                    <button @click="setTheme('dark')" title="Dark theme"
+                            :class="themeMode === 'dark' ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500' : 'text-slate-500 hover:text-slate-200 border-transparent'"
+                            class="p-1.5 border rounded-md transition flex items-center">
+                        <i data-lucide="moon" class="w-4 h-4"></i>
+                    </button>
+                    <button @click="setTheme('system')" title="System theme"
+                            :class="themeMode === 'system' ? 'bg-indigo-600/30 text-indigo-300 border-indigo-500' : 'text-slate-500 hover:text-slate-200 border-transparent'"
+                            class="p-1.5 border rounded-md transition flex items-center">
+                        <i data-lucide="monitor" class="w-4 h-4"></i>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Metrics -->
+        <section class="grid grid-cols-3 gap-4">
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Evaluated jobs</span>
+                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.evaluated }}</span>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Avg Fit</span>
+                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.average_fit }}%</span>
+            </div>
+            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
+                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Top Fit</span>
+                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.top_fit }}%</span>
+            </div>
+        </section>
+
+        <!-- App -->
+        <main class="flex flex-col gap-5 flex-1">
+
+            <!-- View switcher -->
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <button @click="viewMode = 'explore'"
+                        :class="viewMode === 'explore' ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'"
+                        class="px-3 py-1.5 text-xs font-semibold border rounded-lg transition flex items-center gap-1.5">
+                    <i data-lucide="layout-grid" class="w-3.5 h-3.5"></i> Explore report
+                </button>
+                <button @click="viewMode = 'applied'"
+                        :class="viewMode === 'applied' ? 'bg-emerald-600/20 border-emerald-500 text-emerald-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'"
+                        class="px-3 py-1.5 text-xs font-semibold border rounded-lg transition flex items-center gap-1.5">
+                    <i data-lucide="check-circle" class="w-3.5 h-3.5"></i> Applied
+                    <span class="bg-emerald-500/20 text-emerald-300 text-[10px] font-bold rounded px-1.5 py-0.5" x-text="appliedCount"></span>
+                </button>
+            </div>
+
+            <!-- ============ EXPLORE VIEW ============ -->
+            <div x-show="viewMode === 'explore'" x-cloak class="flex flex-col gap-5">
+
+            <!-- Results toolbar -->
+            <div class="flex flex-wrap items-center justify-between gap-3">
+                <div class="flex items-center gap-3 text-sm">
+                    <span class="font-semibold text-white"><span x-text="showingCount"></span></span>
+                    <span class="text-slate-500">of</span>
+                    <span class="font-semibold text-slate-300" x-text="evaluatedTotal"></span>
+                    <span class="text-slate-500">evaluated jobs</span>
+                    <span class="bg-slate-900 border border-slate-800 rounded-lg px-2.5 py-1 text-xs text-indigo-300">
+                        Avg Fit (filtered): <span x-text="avgFitFiltered"></span>%
+                    </span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider mr-1">Export:</span>
+                    <button @click="exportCsv()" title="Download the N filtered results as CSV (for Excel/Notion)" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <i data-lucide="file-text" class="w-3.5 h-3.5"></i> CSV
+                    </button>
+                    <button @click="exportJson()" title="Download the N filtered results as JSON" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+                        <i data-lucide="braces" class="w-3.5 h-3.5"></i> JSON
+                    </button>
+                    <button @click="resetFilters()" title="Remove all active filters" class="bg-rose-950/40 hover:bg-rose-900/40 border border-rose-900/40 text-rose-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition">
+                        Clear filters
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex flex-col lg:flex-row gap-6 items-start">
+
+                <!-- ============ FILTERS LEFT RAIL ============ -->
+                <aside class="w-full lg:w-72 shrink-0 flex flex-col gap-4 bg-slate-900/40 border border-slate-800 rounded-xl p-4 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Search</label>
+                        <input x-model="search" @input="saveFilters()" type="text" placeholder="Title, company, location..."
+                               class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
+                    </div>
+
+                    <!-- Work mode multi-select -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Work mode (multi-select)</label>
+                        <div class="flex flex-col gap-1.5">
+                            <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition">
+                                <input type="checkbox" value="remote" x-model="modes" @change="saveFilters()" class="accent-indigo-500">
+                                <span class="text-teal-400">Remote</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition">
+                                <input type="checkbox" value="hybrid" x-model="modes" @change="saveFilters()" class="accent-indigo-500">
+                                <span class="text-amber-400">Hybrid</span>
+                            </label>
+                            <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition">
+                                <input type="checkbox" value="onsite" x-model="modes" @change="saveFilters()" class="accent-indigo-500">
+                                <span class="text-slate-400">On-site</span>
+                            </label>
+                            <p class="text-[11px] text-slate-600" x-show="modes.length === 0">None selected = all.</p>
+                        </div>
+                    </div>
+
+                    <!-- Date posted -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Posted</label>
+                        <div class="flex flex-wrap gap-1.5">
+                            <template x-for="opt in dateOptions" :key="opt.v">
+                                <button @click="dateChip = opt.v; saveFilters()" :class="dateChip === opt.v ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'" class="px-2.5 py-1 text-[11px] font-semibold border rounded-lg transition" x-text="opt.l"></button>
+                            </template>
+                        </div>
+                        <div class="flex items-center gap-2 mt-2">
+                            <input x-model="fromDate" @change="dateChip='any'; saveFilters()" type="date" title="Posted from" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <span class="text-slate-600">–</span>
+                            <input x-model="toDate" @change="dateChip='any'; saveFilters()" type="date" title="Posted until" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-xs text-slate-200 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Salary -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Salary (USD k)</label>
+                        <div class="flex items-center gap-2">
+                            <input x-model="salMin" @change="saveFilters()" type="number" min="0" placeholder="Min" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <span class="text-slate-600">–</span>
+                            <input x-model="salMax" @change="saveFilters()" type="number" min="0" placeholder="Max" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                        <label class="flex items-center gap-2 text-xs mt-1.5 text-slate-400 cursor-pointer">
+                            <input type="checkbox" x-model="withSalary" @change="saveFilters()" class="accent-indigo-500">
+                            Only with disclosed salary
+                        </label>
+                    </div>
+
+                    <!-- Visa / relocation -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Visa / Relocation</label>
+                        <div class="flex flex-col gap-1.5 text-sm">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" x-model="requireSponsorship" @change="saveFilters()" class="accent-emerald-500">
+                                <span class="text-emerald-400">Offers sponsorship</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" x-model="requireRelocation" @change="saveFilters()" class="accent-emerald-500">
+                                <span class="text-emerald-400">Relocation support</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" x-model="requireUsEligible" @change="saveFilters()" class="accent-emerald-500">
+                                <span class="text-emerald-400">Doesn't exclude sponsorship</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Application friction -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Application friction</label>
+                        <div class="flex flex-col gap-1.5 text-sm">
+                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="Low" x-model="frictions" @change="saveFilters()" class="accent-indigo-500"><span class="text-emerald-400">Low</span></label>
+                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="Medium" x-model="frictions" @change="saveFilters()" class="accent-indigo-500"><span class="text-amber-400">Medium</span></label>
+                            <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="High" x-model="frictions" @change="saveFilters()" class="accent-indigo-500"><span class="text-rose-400">High</span></label>
+                        </div>
+                    </div>
+
+                    <!-- Red flags -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Red flags</label>
+                        <select x-model="redFlags" @change="saveFilters()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="any">Any</option>
+                            <option value="none">No red flags</option>
+                            <option value="1+">1 or more</option>
+                            <option value="2+">2 or more</option>
+                        </select>
+                    </div>
+
+                    <!-- Fit range -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Fit score</label>
+                        <div class="flex items-center gap-2 text-xs">
+                            <input x-model.number="fitMin" @change="saveFilters()" type="number" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                            <span class="text-slate-600">–</span>
+                            <input x-model.number="fitMax" @change="saveFilters()" type="number" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
+                        </div>
+                    </div>
+
+                    <!-- Application status (kanban) -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">My application</label>
+                        <select x-model="appFilter" @change="saveFilters()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                            <option value="all">All</option>
+                            <option value="apply">To apply</option>
+                            <option value="applied">Applied</option>
+                            <option value="interview">Interview</option>
+                            <option value="rejected">Discarded</option>
+                        </select>
+                    </div>
+
+                    <!-- Locations -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Location (multi-select)</label>
+                        <div class="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                            <template x-for="loc in locationsOptions" :key="loc">
+                                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                    <input type="checkbox" :value="loc" x-model="locations" @change="saveFilters()" class="accent-indigo-500">
+                                    <span x-text="loc"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+
+                    <!-- Companies -->
+                    <div>
+                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Company (multi-select)</label>
+                        <div class="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
+                            <template x-for="co in companiesOptions" :key="co">
+                                <label class="flex items-center gap-2 text-xs cursor-pointer">
+                                    <input type="checkbox" :value="co" x-model="companies" @change="saveFilters()" class="accent-indigo-500">
+                                    <span x-text="co"></span>
+                                </label>
+                            </template>
+                        </div>
+                    </div>
+
+                </aside>
+
+                <!-- ============ RESULTS ============ -->
+                <section class="flex-1 min-w-0 w-full flex flex-col gap-3">
+
+                    <!-- Multi-level sort bar -->
+                    <div class="flex flex-wrap items-center gap-2 bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3">
+                        <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sort by:</span>
+                        <template x-for="(key, i) in sortKeys" :key="i">
+                            <div class="flex items-center gap-1.5">
+                                <select x-model="sortKeys[i].field" @change="saveFilters()" class="bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
+                                    <template x-for="f in sortFields" :key="f.v">
+                                        <option :value="f.v" x-text="f.l"></option>
+                                    </template>
+                                </select>
+                                <button @click="toggleSortDir(i)" title="Toggle direction"
+                                        :class="sortKeys[i].dir === 'desc' ? 'text-indigo-300' : 'text-emerald-300'"
+                                        class="bg-slate-950 border border-slate-800 text-xs font-semibold px-2 py-1.5 rounded-lg transition" x-text="sortKeys[i].dir === 'desc' ? 'Desc ↓' : 'Asc ↑'"></button>
+                                <button @click="removeSortKey(i)" title="Remove sort level" class="text-slate-500 hover:text-rose-400 text-sm px-1 transition">✕</button>
+                                <span x-show="i < sortKeys.length - 1" class="text-slate-600 text-[11px] font-bold">›</span>
+                            </div>
+                        </template>
+                        <button @click="addSortKey()" x-show="sortKeys.length < 3"
+                                class="bg-slate-950 hover:bg-slate-800 border border-dashed border-slate-700 text-slate-400 hover:text-slate-200 text-xs font-semibold px-2.5 py-1.5 rounded-lg transition">
+                            + Add level
+                        </button>
+                    </div>
+
+                    <!-- Empty state -->
+                    <div x-show="filteredJobs.length === 0" x-cloak class="text-center py-16 bg-slate-900/20 border border-slate-800/80 rounded-xl">
+                        <p class="text-slate-400 font-medium">No jobs match your active filters.</p>
+                    </div>
+
+                    <!-- Job cards -->
+                    <template x-for="job in filteredJobs" :key="job.id">
+                        <div class="bg-slate-900/50 border rounded-xl overflow-hidden transition-all duration-200"
+                             :class="expandedJob === job.id ? 'border-slate-700 ring-1 ring-slate-800' : 'border-slate-800/80 hover:border-slate-700/80'">
+
+                            <!-- Header (compact row) -->
+                            <div @click="toggleExpand(job.id)" class="px-4 py-3 flex items-center gap-4 cursor-pointer select-none hover:bg-slate-800/20 transition">
+
+                                <!-- Fit compact -->
+                                <div class="w-16 shrink-0 flex flex-col items-center gap-0.5">
+                                    <span class="text-sm font-semibold text-slate-200" x-text="job.fit_score + '%'"></span>
+                                    <div class="w-full h-1 bg-slate-800 rounded-full overflow-hidden">
+                                        <div class="h-full bg-indigo-400/80 rounded-full" :style="'width:' + (job.fit_score || 0) + '%'"></div>
+                                    </div>
+                                    <span class="text-[10px] uppercase text-slate-500 font-medium tracking-wide">Fit</span>
+                                </div>
+
+                                <!-- Main -->
+                                <div class="min-w-0 flex-1">
+                                    <div class="flex items-center gap-1.5 flex-wrap text-xs text-slate-400">
+                                        <span class="font-semibold text-slate-300" x-text="job.company"></span>
+                                        <span class="text-slate-700">•</span>
+                                        <span x-text="job.location"></span>
+                                        <span class="text-slate-600" x-text="job.relative_date"></span>
+                                        <span class="text-slate-700" x-show="job.date_posted" x-text="job.date_posted"></span>
+                                        <span x-show="job.is_new" class="chip bg-slate-800/70 text-slate-300 border border-slate-700">New</span>
+                                    </div>
+                                    <h3 class="text-[15px] font-semibold text-white truncate" x-text="job.title"></h3>
+                                    <div class="flex items-center gap-2 flex-wrap text-xs mt-0.5">
+                                        <span class="inline-flex items-center gap-1 text-slate-300" x-show="formatSalary(job.salary_min, job.salary_max, job.currency)">
+                                            <span class="font-semibold text-slate-500">$</span>
+                                            <span x-text="formatSalary(job.salary_min, job.salary_max, job.currency)"></span>
+                                        </span>
+                                        <template x-if="job.sponsorship">
+                                            <span class="chip bg-slate-800/70 text-slate-300 border border-slate-700">Visa</span>
+                                        </template>
+                                        <template x-if="job.relocation_support">
+                                            <span class="chip bg-slate-800/70 text-slate-300 border border-slate-700">Relo</span>
+                                        </template>
+                                        <template x-if="job.us_eligible === false">
+                                            <span class="chip bg-slate-800/70 text-rose-300/80 border border-slate-700">No visa</span>
+                                        </template>
+                                        <template x-if="job.visa_keywords">
+                                            <span class="text-slate-600" x-text="job.visa_keywords"></span>
+                                        </template>
+                                    </div>
+                                </div>
+
+                                <!-- Kanban compact -->
+                                <div class="shrink-0 hidden lg:flex flex-col gap-1">
+                                    <template x-for="st in appStatusOptions" :key="st.v">
+                                        <button @click.stop="setAppState(job.id, st.v)"
+                                                :class="(appStates[job.id] || 'apply') === st.v ? st.onCls : 'bg-slate-950 border-slate-800 text-slate-600 hover:text-slate-300'"
+                                                class="text-[10px] font-semibold border rounded px-2 py-1 leading-none transition" x-text="st.l"></button>
+                                    </template>
+                                </div>
+
+                                <!-- Prob + chevron -->
+                                <div class="shrink-0 flex items-center gap-2">
+                                    <span class="text-xs text-slate-400" x-show="job.state === 'EVALUATED'">Prob <span class="font-bold text-slate-300" x-text="job.interview_probability + '%'"></span></span>
+                                    <i data-lucide="chevron-down" class="w-4 h-4 text-slate-500 transition-transform duration-200" :class="expandedJob === job.id ? 'rotate-180 text-white' : ''"></i>
+                                </div>
+                            </div>
+
+                            <!-- Expanded detail -->
+                            <div x-show="expandedJob === job.id" x-collapse x-cloak class="border-t border-slate-800 bg-slate-900/20">
+                                <div class="p-5 flex flex-col gap-5">
+
+                                    <!-- Skill chips (moved here to keep rows compact) -->
+                                    <div class="flex flex-wrap gap-1.5">
+                                        <template x-for="chip in (job.skill_chips || [])" :key="chip.name">
+                                            <span class="inline-flex items-center gap-1.5 text-[11px] text-slate-300 border border-slate-800 bg-slate-950/60 rounded px-2 py-0.5">
+                                                <span class="w-1.5 h-1.5 rounded-full" :class="{
+                                                    'bg-emerald-400': chip.status === 'match',
+                                                    'bg-amber-400': chip.status === 'transferable',
+                                                    'bg-rose-400': chip.status === 'gap'
+                                                }"></span>
+                                                <span x-text="chip.name"></span>
+                                            </span>
+                                        </template>
+                                        <template x-if="(job.skill_chips || []).length === 0">
+                                            <span class="text-xs text-slate-600 italic">No skill chips detected.</span>
+                                        </template>
+                                    </div>
+
+                                    <!-- Actions -->
+                                    <div class="flex flex-wrap items-center justify-between gap-2 border-b border-slate-800/80 pb-4">
+                                        <div class="flex flex-wrap gap-3 text-xs text-slate-300">
+                                            <span class="inline-flex items-center gap-1.5"><span class="text-slate-500 uppercase font-bold tracking-wider">Salary</span><span x-text="formatSalary(job.salary_min, job.salary_max, job.currency) || 'Not disclosed'"></span></span>
+                                            <span class="inline-flex items-center gap-1.5"><span class="text-slate-500 uppercase font-bold tracking-wider">Posted</span><span x-text="job.date_posted || 'Unknown'"></span></span>
+                                            <span class="inline-flex items-center gap-1.5"><span class="text-slate-500 uppercase font-bold tracking-wider">Visa</span><span x-text="job.visa_keywords || 'No signals'"></span></span>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <button @click.stop="quickApply(job)" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition">
+                                                <i data-lucide="copy" class="w-3.5 h-3.5"></i> Quick Apply
+                                            </button>
+                                            <a :href="job.job_url" target="_blank" rel="noopener noreferrer" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-3 py-1.5 rounded-lg inline-flex items-center gap-1.5 transition">
+                                                Apply <i data-lucide="external-link" class="w-3.5 h-3.5"></i>
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    <template x-if="job.screening_reason">
+                                        <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
+                                            <h4 class="text-xs font-medium uppercase tracking-wider text-slate-400">Screening Logic</h4>
+                                            <p class="text-slate-300 text-sm mt-1" x-text="job.screening_reason"></p>
+                                        </div>
+                                    </template>
+
+                                    <template x-if="job.state === 'EVALUATED'">
+                                        <div class="flex flex-col gap-5">
+
+                                            <!-- Interview cheat sheet -->
+                                            <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-3">
+                                                <h4 class="text-xs font-medium uppercase tracking-wider text-slate-300 flex items-center gap-1.5">
+                                                    <i data-lucide="brain" class="w-4 h-4 text-slate-400"></i> Interview Cheat Sheet
+                                                </h4>
+                                                <div>
+                                                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">What to highlight</p>
+                                                    <ul class="text-sm text-slate-300 flex flex-col gap-1 list-none">
+                                                        <template x-for="h in cheatHighlights(job)">
+                                                            <li class="flex gap-2"><span class="text-emerald-400 shrink-0">+</span><span x-text="h"></span></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                                <div>
+                                                    <p class="text-xs font-bold text-slate-400 uppercase mb-1">Potential trap questions (from red flags)</p>
+                                                    <ul class="text-sm text-slate-300 flex flex-col gap-1 list-none">
+                                                        <template x-for="q in trapQuestions(job)">
+                                                            <li class="flex gap-2"><span class="text-rose-400 shrink-0">?</span><span x-text="q"></span></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                            </div>
+
+                                            <!-- Seniority -->
+                                            <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4">
+                                                <h4 class="text-xs font-medium uppercase tracking-wider text-slate-400">True Seniority Alignment</h4>
+                                                <p class="text-slate-300 text-sm mt-1" x-text="job.true_seniority_alignment"></p>
+                                            </div>
+
+                                            <!-- Core stack overlap -->
+                                            <div class="flex flex-col gap-2">
+                                                <h4 class="text-xs font-bold uppercase tracking-wider text-slate-400">Core Stack Overlap</h4>
+                                                <div class="flex flex-wrap gap-1.5">
+                                                    <template x-for="tech in job.core_stack_overlap">
+                                                        <span class="bg-slate-950 text-indigo-300 border border-indigo-500/25 px-2.5 py-1 rounded text-xs font-medium" x-text="tech"></span>
+                                                    </template>
+                                                    <template x-if="job.core_stack_overlap.length === 0">
+                                                        <span class="text-xs text-slate-500 italic">Sin overlap detectado.</span>
+                                                    </template>
+                                                </div>
+                                            </div>
+
+                                            <!-- Pros / Cons -->
+                                            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+                                                    <h4 class="text-xs font-medium uppercase tracking-wider text-slate-400">Pros</h4>
+                                                    <ul class="text-sm text-slate-300 flex flex-col gap-1.5 list-none">
+                                                        <template x-for="p in job.pros">
+                                                            <li class="flex gap-2"><span class="text-emerald-500 font-bold shrink-0">+</span><span x-text="p"></span></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                                <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+                                                    <h4 class="text-xs font-medium uppercase tracking-wider text-slate-400">Cons</h4>
+                                                    <ul class="text-sm text-slate-300 flex flex-col gap-1.5 list-none">
+                                                        <template x-for="c in job.cons">
+                                                            <li class="flex gap-2"><span class="text-rose-500 font-bold shrink-0">-</span><span x-text="c"></span></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                            </div>
+
+                                            <!-- Red flags -->
+                                            <template x-if="job.red_flags.length > 0">
+                                                <div class="bg-slate-900/40 border border-slate-800 rounded-lg p-4 flex flex-col gap-2">
+                                                    <h4 class="text-xs font-medium uppercase tracking-wider text-rose-300/90">Red Flags</h4>
+                                                    <ul class="list-disc list-inside text-sm text-slate-300 flex flex-col gap-1">
+                                                        <template x-for="flag in job.red_flags">
+                                                            <li x-text="flag"></li>
+                                                        </template>
+                                                    </ul>
+                                                </div>
+                                            </template>
+
+                                            <!-- Friction -->
+                                            <div class="text-sm text-slate-400">
+                                                <span class="font-bold uppercase text-xs text-slate-500 mr-2">Application friction:</span>
+                                                <span :class="{ 'text-emerald-400': job.application_friction === 'Low', 'text-amber-400': job.application_friction === 'Medium', 'text-rose-400': job.application_friction === 'High' }" x-text="job.application_friction"></span>
+                                            </div>
+
+                                        </div>
+                                    </template>
+
+                                    <!-- Description -->
+                                    <div class="border-t border-slate-800 pt-4">
+                                        <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Description</h4>
+                                        <div class="text-sm text-slate-400 leading-relaxed max-h-60 overflow-y-auto whitespace-pre-line bg-slate-950/40 border border-slate-900 rounded-lg p-4" x-text="job.description"></div>
+                                    </div>
+
+                                </div>
+                            </div>
+                        </div>
+                    </template>
+
+                </section>
+            </div>
+
+            </div>
+
+            <!-- ============ APPLIED VACANCIES VIEW ============ -->
+            <div x-show="viewMode === 'applied'" x-cloak class="flex flex-col gap-4">
+                <div class="flex flex-col gap-4">
+
+                    <div class="flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                            <h2 class="text-lg font-extrabold text-white">Applied vacancies</h2>
+                            <p class="text-xs text-slate-500">Consolidated applications (persisted in DB via <code class="text-indigo-300">set_job_application_status</code>).</p>
+                        </div>
+                        <div class="flex items-center gap-2 flex-wrap">
+                            <template x-for="s in appStatusOptions" :key="s.v">
+                                <button @click="appliedStatus = s.v"
+                                        :class="appliedStatus === s.v ? s.onCls : 'bg-slate-950 border-slate-800 text-slate-500 hover:text-slate-300'"
+                                        class="text-xs font-semibold border px-3 py-1.5 rounded-lg transition" x-text="s.l + ' (' + (appliedCounts[s.v] || 0) + ')'"></button>
+                            </template>
+                        </div>
+                    </div>
+
+                    <div x-show="appliedJobs.length === 0" class="text-center py-16 bg-slate-900/20 border border-slate-800/80 rounded-xl">
+                        <p class="text-slate-400 font-medium">No vacancies with that status. Mark "Applied / Interview / Discarded" on the report cards, or use the MCP tool.</p>
+                    </div>
+
+                    <template x-for="job in appliedJobs" :key="job.id">
+                        <div class="bg-slate-900/50 border border-slate-800/80 rounded-xl p-4 flex flex-col md:flex-row md:items-center justify-between gap-3 hover:border-slate-700/80 transition">
+                            <div class="min-w-0">
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="text-sm font-semibold text-slate-400" x-text="job.company"></span>
+                                    <span class="text-slate-700">•</span>
+                                    <span class="text-xs text-slate-400 flex items-center gap-1"><i data-lucide="map-pin" class="w-3 h-3 text-slate-500"></i><span x-text="job.location"></span></span>
+                                    <template x-if="job.date_posted">
+                                        <span class="text-[11px] text-slate-600" x-text="'Posted: ' + job.date_posted"></span>
+                                    </template>
+                                </div>
+                                <h3 class="text-base font-bold text-white mt-1" x-text="job.title"></h3>
+                                <div class="flex items-center gap-2 flex-wrap mt-1.5">
+                                    <span x-text="(appStates[job.id] || 'apply')"
+                                          :class="appStatusOptions.find(o => o.v === (appStates[job.id] || 'apply'))?.onCls || ''"
+                                          class="chip"></span>
+                                    <span class="text-[11px] text-slate-500" x-show="appStateUpdatedAt[job.id]">Marked: <span x-text="formatUpdatedAt(appStateUpdatedAt[job.id])"></span></span>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-2 shrink-0">
+                                <button @click="quickApply(job)" class="bg-indigo-600 hover:bg-indigo-500 text-white font-semibold text-xs px-3 py-2 rounded-lg transition">Quick Apply</button>
+                                <a :href="job.job_url" target="_blank" rel="noopener noreferrer" class="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs px-3 py-2 rounded-lg transition">Open vacancy</a>
+                                <button @click="setAppState(job.id, 'apply')" title="Back to 'To apply'" class="text-slate-500 hover:text-rose-400 transition text-xs">✕</button>
+                            </div>
+                        </div>
+                    </template>
+
+                </div>
+            </div>
+
+        </main>
+
+        <!-- ============ REPORTS HISTORY SIDE PANEL ============ -->
+        <div x-show="showReports" x-cloak class="fixed inset-0 z-40 bg-black/60 backdrop-blur-sm" @click="showReports = false"></div>
+        <aside x-show="showReports" x-cloak x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-x-full" x-transition:enter-end="translate-x-0"
+               class="fixed top-0 right-0 h-full w-[22rem] max-w-full z-50 bg-slate-900 border-l border-slate-800 shadow-2xl overflow-y-auto overscroll-contain p-5 flex flex-col gap-4">
+
+            <div class="flex items-center justify-between">
+                <h2 class="text-sm font-bold uppercase tracking-wider text-white flex items-center gap-2">
+                    <i data-lucide="history" class="w-4 h-4 text-indigo-400"></i> Reports
+                </h2>
+                <button @click="showReports = false" class="text-slate-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="bg-slate-900/60 border border-slate-800 rounded-lg p-3 flex flex-col gap-1">
+                <span class="text-[10px] uppercase font-semibold tracking-wider text-slate-400">Current report</span>
+                <span class="text-sm font-semibold text-white" x-text="currentReport.generated_at"></span>
+                <span class="text-xs text-slate-400">
+                    <span x-text="currentReport.evaluated"></span> evaluated · fit <span x-text="currentReport.average_fit"></span>%
+                </span>
+                <span class="text-[11px] text-slate-500" x-text="(currentReport.screening_model || '') + ' → ' + (currentReport.evaluation_model || '')"></span>
+                <a href="./index.html" class="text-xs text-indigo-300 font-semibold mt-1 hover:text-indigo-200 underline underline-offset-2">Open the latest (index.html)</a>
+            </div>
+
+            <div class="flex flex-col gap-2">
+                <span class="text-[10px] uppercase font-semibold tracking-wider text-slate-500">History</span>
+                <template x-for="r in reportsManifest" :key="r.file">
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3 flex flex-col gap-1.5"
+                         :class="r.archived ? 'opacity-40' : ''">
+                        <div class="flex items-center justify-between gap-2">
+                            <a x-show="!r.archived" :href="'./' + r.file" class="text-xs font-semibold text-slate-200 hover:text-white transition" x-text="r.generated_at"></a>
+                            <span x-show="r.archived" class="text-xs font-semibold text-slate-400" x-text="r.generated_at"></span>
+                            <button @click="r.archived ? confirmRestore(r) : confirmArchive(r)"
+                                    class="text-[10px] font-semibold px-2 py-1 rounded border transition"
+                                    :class="r.archived ? 'border-slate-700 text-slate-400 hover:text-indigo-300' : 'border-slate-700 text-slate-400 hover:text-rose-300'"
+                                    x-text="r.archived ? 'Restore' : 'Archive'"></button>
+                        </div>
+                        <span class="text-[11px] text-slate-400">
+                            <span x-text="r.evaluated"></span> evaluated · fit <span x-text="r.average_fit"></span>%
+                        </span>
+                        <!-- Search context -->
+                        <template x-if="r.search && (r.search.queries || []).length">
+                            <div class="flex flex-wrap gap-1 items-center">
+                                <span class="text-[10px] uppercase font-semibold tracking-wide text-slate-500">Search:</span>
+                                <template x-for="q in (r.search.queries || [])" :key="q">
+                                    <span class="text-[10px] text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded px-1.5 py-0.5" x-text="q"></span>
+                                </template>
+                                <template x-for="l in (r.search.locations || [])" :key="l">
+                                    <span class="text-[10px] text-slate-300 bg-slate-800/60 border border-slate-700 rounded px-1.5 py-0.5" x-text="l"></span>
+                                </template>
+                                <template x-if="r.search.is_remote">
+                                    <span class="text-[10px] text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">Remote only</span>
+                                </template>
+                                <template x-if="r.search.require_visa_friendly">
+                                    <span class="text-[10px] text-emerald-300/80 border border-emerald-500/20 rounded px-1.5 py-0.5">Visa-friendly</span>
+                                </template>
+                                <template x-if="r.search.min_salary">
+                                    <span class="text-[10px] text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">$<span x-text="Math.round(r.search.min_salary/1000)"></span>k+</span>
+                                </template>
+                            </div>
+                        </template>
+                        <!-- AI summary -->
+                        <details class="text-xs">
+                            <summary class="cursor-pointer font-medium text-slate-300 hover:text-white transition">AI summary</summary>
+                            <div class="mt-2 text-slate-300 leading-relaxed whitespace-pre-line max-h-44 overflow-y-auto overscroll-contain bg-slate-950/40 border border-slate-800/70 rounded-md p-2.5" x-text="cleanSummary(r.ai_summary)"></div>
+                        </details>
+                    </div>
+                </template>
+                <p x-show="reportsManifest.length === 0" class="text-xs text-slate-600 italic">No historical reports yet.</p>
+            </div>
+        </aside>
+
+        <!-- ============ CONFIRM ARCHIVE / RESTORE MODAL ============ -->
+        <div x-show="pendingAction" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="cancelAction()">
+            <div class="bg-slate-900 border border-slate-800 rounded-xl p-5 w-full max-w-sm shadow-2xl flex flex-col gap-4">
+                <h3 class="text-sm font-semibold text-white" x-text="pendingAction?.type === 'archive' ? 'Archive this report?' : 'Restore this report?'"></h3>
+                <p class="text-sm text-slate-400" x-text="pendingAction?.type === 'archive'
+                    ? 'This report will be moved to the archive folder (reports/archive). It is NOT deleted and can be restored later.'
+                    : 'This report will be moved back from the archive to the active reports folder.'"></p>
+                <div class="flex items-center justify-end gap-2">
+                    <button @click="cancelAction()" class="px-3 py-1.5 text-xs font-semibold text-slate-300 bg-slate-800 rounded-lg hover:bg-slate-700 transition">Cancel</button>
+                    <button @click="confirmAction()"
+                            :class="pendingAction?.type === 'archive' ? 'bg-rose-600 hover:bg-rose-500' : 'bg-indigo-600 hover:bg-indigo-500'"
+                            class="px-3 py-1.5 text-xs font-semibold text-white rounded-lg transition"
+                            x-text="pendingAction?.type === 'archive' ? 'Archive' : 'Restore'"></button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast -->
+    <div x-data="{ msg: '' }" x-on:toast.window="msg = $event.detail; $el.style.opacity = 1; clearTimeout($el._t); $el._t = setTimeout(() => $el.style.opacity = 0, 1800)"
+         x-init="$el.style.opacity = 0" style="transition: opacity .25s" class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-slate-900 border border-indigo-500/40 text-slate-100 text-sm font-medium px-4 py-2 rounded-lg shadow-xl z-50 pointer-events-none">
+        <span x-text="msg"></span>
+    </div>
+
+    <!-- Script -->
+    <script>
+        window.jobsData = {{ jobs | tojson }};
+        window.profileSummary = {{ profile_summary | tojson }};
+        window.profileCoreStack = {{ profile_core_stack | tojson }};
+        window.reportsManifest = {{ reports_manifest | tojson }};
+        window.currentReport = {{ current_report | tojson }};
+
+        const LS_FILTERS = 'jobscan.filters.v3';
+        const LS_FILTERS_SCHEMA = 3;
+        const LS_APP = 'jobscan.app.v1';
+        const LS_THEME = 'jobscan.theme.v1';
+
+        function jobScreeningApp() {
+            return {
+                jobs: window.jobsData || [],
+                // filters
+                search: '',
+                modes: [],
+                dateChip: 'any',
+                fromDate: '',
+                toDate: '',
+                salMin: '',
+                salMax: '',
+                withSalary: false,
+                requireSponsorship: false,
+                requireRelocation: false,
+                requireUsEligible: false,
+                frictions: [],
+                redFlags: 'any',
+                fitMin: 0,
+                fitMax: 100,
+                appFilter: 'all',
+                locations: [],
+                companies: [],
+                sortKeys: [{ field: 'fit', dir: 'desc' }],
+                // ui
+                expandedJob: null,
+                appStates: {},
+                appStateUpdatedAt: {},
+                viewMode: 'explore',
+                appliedStatus: 'all',
+                showReports: false,
+                pendingAction: null,
+                reportsManifest: window.reportsManifest || [],
+                currentReport: window.currentReport || {},
+                themeMode: 'system',
+                dateOptions: [
+                    { v: 'any', l: 'Any' },
+                    { v: '24h', l: '24h' },
+                    { v: '7d', l: '7 days' },
+                    { v: '30d', l: '30 days' },
+                ],
+                appStatusOptions: [
+                    { v: 'apply', l: 'Apply', onCls: 'bg-indigo-500/15 border-indigo-500/60 text-indigo-300' },
+                    { v: 'applied', l: 'Applied', onCls: 'bg-indigo-500/15 border-indigo-500/60 text-indigo-300' },
+                    { v: 'interview', l: 'Interview', onCls: 'bg-indigo-500/15 border-indigo-500/60 text-indigo-300' },
+                    { v: 'rejected', l: 'Discarded', onCls: 'bg-indigo-500/15 border-indigo-500/60 text-indigo-300' },
+                ],
+                sortFields: [
+                    { v: 'fit', l: 'Fit score' },
+                    { v: 'probability', l: 'Interview prob.' },
+                    { v: 'salary', l: 'Salary' },
+                    { v: 'date', l: 'Date posted' },
+                    { v: 'friction', l: 'Friction (Low first)' },
+                    { v: 'redflags', l: 'Fewest red flags' },
+                    { v: 'company', l: 'Company (A-Z)' },
+                    { v: 'location', l: 'Location' },
+                ],
+
+                init() {
+                    this.seedAppStates();
+                    this.restoreFilters();
+                    this.restoreApp();
+                    this.restoreTheme();
+                    this.applyTheme();
+                    this.$nextTick(() => lucide.createIcons());
+                    // React to OS theme changes while in "system" mode
+                    if (window.matchMedia) {
+                        window.matchMedia('(prefers-color-scheme: dark)').addEventListener('change', () => {
+                            if (this.themeMode === 'system') this.applyTheme();
+                        });
+                    }
+                },
+
+                /* ---------- application states ---------- */
+                seedAppStates() {
+                    this.jobs.forEach(j => {
+                        if (j.application_status && j.application_status !== 'apply') {
+                            this.appStates[j.id] = j.application_status;
+                        }
+                        if (j.application_status_updated_at) {
+                            this.appStateUpdatedAt[j.id] = j.application_status_updated_at;
+                        }
+                    });
+                },
+
+                /* ---------- theme ---------- */
+                setTheme(mode) {
+                    this.themeMode = mode;
+                    try { localStorage.setItem(LS_THEME, mode); } catch (e) {}
+                    this.applyTheme();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                restoreTheme() {
+                    try { this.themeMode = localStorage.getItem(LS_THEME) || 'system'; } catch (e) { this.themeMode = 'system'; }
+                },
+                applyTheme() {
+                    if (!document.documentElement) return;
+                    const prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+                    const dark = this.themeMode === 'dark' || (this.themeMode === 'system' && prefersDark);
+                    document.documentElement.classList.toggle('theme-light', !dark);
+                },
+
+                /* ---------- persistence ---------- */
+                saveFilters() {
+                    try {
+                        localStorage.setItem(LS_FILTERS, JSON.stringify({
+                            v: LS_FILTERS_SCHEMA,
+                            search: this.search, modes: this.modes, dateChip: this.dateChip, fromDate: this.fromDate, toDate: this.toDate,
+                            salMin: this.salMin, salMax: this.salMax, withSalary: this.withSalary,
+                            requireSponsorship: this.requireSponsorship, requireRelocation: this.requireRelocation,
+                            requireUsEligible: this.requireUsEligible, frictions: this.frictions, redFlags: this.redFlags,
+                            fitMin: this.fitMin, fitMax: this.fitMax, appFilter: this.appFilter,
+                            locations: this.locations, companies: this.companies, sortKeys: this.sortKeys
+                        }));
+                    } catch (e) { /* storage unavailable */ }
+                },
+                restoreFilters() {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem(LS_FILTERS) || '{}');
+                        if (saved && saved.v === LS_FILTERS_SCHEMA) {
+                            Object.assign(this, saved);
+                        } else {
+                            // Stale/unknown filter schema: keep defaults and clear storage.
+                            try { localStorage.removeItem(LS_FILTERS); } catch (e) {}
+                        }
+                    } catch (e) { /* ignore */ }
+                },
+                saveApp() {
+                    try { localStorage.setItem(LS_APP, JSON.stringify({ statuses: this.appStates, updatedAt: this.appStateUpdatedAt })); } catch (e) {}
+                },
+                restoreApp() {
+                    try {
+                        const saved = JSON.parse(localStorage.getItem(LS_APP) || '{}');
+                        if (saved.statuses) Object.assign(this.appStates, saved.statuses);
+                        if (saved.updatedAt) Object.assign(this.appStateUpdatedAt, saved.updatedAt);
+                    } catch (e) { /* ignore */ }
+                },
+                resetFilters() {
+                    this.search = ''; this.modes = []; this.dateChip = 'any'; this.fromDate = ''; this.toDate = '';
+                    this.salMin = ''; this.salMax = '';
+                    this.withSalary = false; this.requireSponsorship = false; this.requireRelocation = false;
+                    this.requireUsEligible = false; this.frictions = []; this.redFlags = 'any'; this.fitMin = 0;
+                    this.fitMax = 100; this.appFilter = 'all'; this.locations = []; this.companies = [];
+                    this.sortKeys = [{ field: 'fit', dir: 'desc' }];
+                    this.saveFilters();
+                },
+
+                /* ---------- helpers ---------- */
+                jobMode(j) {
+                    const d = (j.description || '').toLowerCase();
+                    const l = (j.location || '').toLowerCase();
+                    if (d.includes('hybrid') || l.includes('hybrid')) return 'hybrid';
+                    if (j.is_remote === true || d.includes('work from home') || d.includes('remote')) return 'remote';
+                    return 'onsite';
+                },
+                get locationsOptions() {
+                    return [...new Set(this.jobs.map(j => j.location).filter(Boolean))].sort((a, b) => a.localeCompare(b)).slice(0, 30);
+                },
+                get companiesOptions() {
+                    return [...new Set(this.jobs.map(j => j.company).filter(Boolean))].sort((a, b) => a.localeCompare(b)).slice(0, 40);
+                },
+                get showingCount() { return this.filteredJobs.length; },
+                get evaluatedTotal() { return this.jobs.filter(j => j.state === 'EVALUATED').length; },
+                get avgFitFiltered() {
+                    const ev = this.filteredJobs.filter(j => j.state === 'EVALUATED' && j.fit_score);
+                    if (!ev.length) return 0;
+                    return Math.round(ev.reduce((s, j) => s + j.fit_score, 0) / ev.length);
+                },
+
+                /* ---------- date helpers ---------- */
+                daysAgo(dateStr) {
+                    if (!dateStr) return null;
+                    const t = new Date(dateStr + 'T00:00:00');
+                    const today = new Date();
+                    today.setHours(0, 0, 0, 0);
+                    return Math.round((today - t) / 86400000);
+                },
+                formatUpdatedAt(iso) {
+                    if (!iso) return '';
+                    const d = new Date(iso);
+                    if (isNaN(d)) return '';
+                    return d.toLocaleString('en-US', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+                },
+
+                cleanSummary(text) {
+                    if (!text) return 'No AI summary available.';
+                    return String(text)
+                        .split('\n')
+                        .map(l => l.replace(/^[-•*\d.\s]+/, '').replace(/\*\*|__|`|\*/g, '').trim())
+                        .filter(Boolean)
+                        .map(l => '• ' + l)
+                        .join('\n');
+                },
+
+                /* ---------- multi-level sort ---------- */
+                addSortKey() {
+                    if (this.sortKeys.length < 3) this.sortKeys.push({ field: 'fit', dir: 'desc' });
+                    this.saveFilters();
+                },
+                removeSortKey(i) {
+                    this.sortKeys.splice(i, 1);
+                    if (!this.sortKeys.length) this.sortKeys.push({ field: 'fit', dir: 'desc' });
+                    this.saveFilters();
+                },
+                toggleSortDir(i) {
+                    this.sortKeys[i].dir = this.sortKeys[i].dir === 'desc' ? 'asc' : 'desc';
+                    this.saveFilters();
+                },
+                sortValue(j, field) {
+                    switch (field) {
+                        case 'fit': return j.fit_score || 0;
+                        case 'probability': return j.interview_probability || 0;
+                        case 'salary': return j.salary_min || j.salary_max || 0;
+                        case 'date': return j.days_since_posted == null ? 999999 : -j.days_since_posted;
+                        case 'friction': return { Low: 1, Medium: 2, High: 3 }[j.application_friction] || 2;
+                        case 'redflags': return (j.red_flags || []).length;
+                        case 'company': return (j.company || '').toLowerCase();
+                        case 'location': return (j.location || '').toLowerCase();
+                        default: return 0;
+                    }
+                },
+
+                /* ---------- archive / restore (moved server-side via MCP tool) ---------- */
+                confirmArchive(r) { this.pendingAction = { type: 'archive', r }; },
+                confirmRestore(r) { this.pendingAction = { type: 'restore', r }; },
+                cancelAction() { this.pendingAction = null; },
+                confirmAction() {
+                    const a = this.pendingAction;
+                    if (!a) return;
+                    const tool = a.type === 'archive' ? 'archive_report' : 'restore_report';
+                    this.copyText(`${tool}("${a.r.file}")`);
+                    this.pendingAction = null;
+                    this.$dispatch('toast',
+                        a.type === 'archive'
+                            ? 'Archive requested. This static UI cannot move files; run the MCP tool archive_report (copied to clipboard).'
+                            : 'Restore requested. Run the MCP tool restore_report (copied to clipboard).');
+                },
+
+                /* ---------- applied view ---------- */                get appliedCounts() {
+                    const c = { apply: 0, applied: 0, interview: 0, rejected: 0 };
+                    this.jobs.forEach(j => { const s = this.appStates[j.id] || 'apply'; if (s in c) c[s] += 1; });
+                    return c;
+                },
+                get appliedCount() {
+                    const c = this.appliedCounts;
+                    return (c.applied || 0) + (c.interview || 0) + (c.rejected || 0);
+                },
+                get appliedJobs() {
+                    const wanted = this.appliedStatus === 'all'
+                        ? ['applied', 'interview', 'rejected']
+                        : [this.appliedStatus];
+                    return this.jobs
+                        .filter(j => wanted.includes(this.appStates[j.id] || 'apply'))
+                        .sort((a, b) => {
+                            const ta = this.appStateUpdatedAt[a.id] || '';
+                            const tb = this.appStateUpdatedAt[b.id] || '';
+                            return tb.localeCompare(ta) || (b.fit_score || 0) - (a.fit_score || 0);
+                        });
+                },
+
+                toggleExpand(jobId) {
+                    this.expandedJob = this.expandedJob === jobId ? null : jobId;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                getScoreColorClass(score) {
+                    if (score >= 85) return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
+                    if (score >= 60) return 'bg-amber-500/10 border-amber-500/25 text-amber-500';
+                    return 'bg-rose-500/10 border-rose-500/20 text-rose-400';
+                },
+                formatSalary(min, max, currency) {
+                    const symbol = currency === 'EUR' ? '€' : currency === 'GBP' ? '£' : '$';
+                    if (min && max) return `${symbol}${Number(min).toLocaleString()} - ${symbol}${Number(max).toLocaleString()}`;
+                    if (min) return `>${symbol}${Number(min).toLocaleString()}`;
+                    if (max) return `<${symbol}${Number(max).toLocaleString()}`;
+                    return '';
+                },
+
+                /* ---------- kanban ---------- */
+                setAppState(id, st) {
+                    this.appStates[id] = st;
+                    if (st === 'apply') {
+                        delete this.appStates[id];
+                        delete this.appStateUpdatedAt[id];
+                    } else {
+                        this.appStateUpdatedAt[id] = new Date().toISOString();
+                    }
+                    this.saveApp();
+                    this.$nextTick(() => lucide.createIcons());
+                },
+
+                /* ---------- cheat sheet ---------- */
+                cheatHighlights(job) {
+                    const h = [];
+                    if (job.core_stack_overlap && job.core_stack_overlap.length) {
+                        h.push('Your stack already covers: ' + job.core_stack_overlap.join(', ') + '.');
+                    }
+                    (job.pros || []).slice(0, 3).forEach(p => h.push(p));
+                    return h.length ? h : ['No evaluated metrics for this role.'];
+                },
+                trapQuestions(job) {
+                    const map = [
+                        [/on-?call|rotat|weekend/i, 'Rotations / on-call: how are shifts organized and compensated?'],
+                        [/burnout|crunch|fast-?paced|long hours|high turnover/i, 'Work-life balance: what hours are expected and why does the team turn over?'],
+                        [/wear many hats|jack of all|do it all/i, 'Scope: does the role mix many responsibilities without a clear definition?'],
+                        [/5 rounds|long interview|take-?home/i, 'Process: why so many rounds / a take-home? Is the time invested compensated?'],
+                        [/stack ranking|pipeline|pip/i, 'Performance: is there internal ranking/stacking? How does it affect reviews?'],
+                        [/fast growth|hyper.?growth|scrappy/i, 'Pace: how much "chaos" is tolerated because of fast growth?'],
+                    ];
+                    const flags = job.red_flags || [];
+                    if (!flags.length) return ['No red flags detected; still verify culture, team and benefits in the interview.'];
+                    return flags.map(f => {
+                        const hit = map.find(([re]) => re.test(f));
+                        return hit ? hit[1] : 'Dig deeper into: ' + f;
+                    });
+                },
+
+                /* ---------- quick apply ---------- */
+                quickApply(job) {
+                    const lines = [
+                        'APPLICATION — ' + job.title,
+                        job.company + ' — ' + job.location,
+                        'Salary: ' + (this.formatSalary(job.salary_min, job.salary_max, job.currency) || 'not disclosed'),
+                        '',
+                        "Why I'm a good fit",
+                        ...this.cheatHighlights(job).map(h => '• ' + h),
+                        '',
+                        'Main stack: ' + (window.profileCoreStack || []).join(', '),
+                        (window.profileSummary ? 'Summary: ' + window.profileSummary : ''),
+                        '',
+                        'Source: ' + job.job_url
+                    ];
+                    this.copyText(lines.filter(Boolean).join('\n'));
+                },
+                copyText(text) {
+                    const done = () => this.$dispatch('toast', 'Copied to clipboard');
+                    const fail = () => this.$dispatch('toast', 'Could not copy');
+                    if (navigator.clipboard && navigator.clipboard.writeText) {
+                        navigator.clipboard.writeText(text).then(done).catch(() => {
+                            this.fallbackCopy(text) ? done() : fail();
+                        });
+                    } else {
+                        this.fallbackCopy(text) ? done() : fail();
+                    }
+                },
+                fallbackCopy(text) {
+                    try {
+                        const ta = document.createElement('textarea');
+                        ta.value = text;
+                        ta.style.position = 'fixed';
+                        ta.style.opacity = '0';
+                        document.body.appendChild(ta);
+                        ta.select();
+                        const ok = document.execCommand('copy');
+                        document.body.removeChild(ta);
+                        return ok;
+                    } catch (e) { return false; }
+                },
+
+                /* ---------- export ---------- */
+                exportCsv() {
+                    const headers = ['Company', 'Title', 'Location', 'State', 'Fit', 'Prob', 'Salary', 'Posted', 'Sponsorship', 'Relocation', 'Friction', 'RedFlags', 'URL'];
+                    const esc = v => '"' + String(v ?? '').replace(/"/g, '""') + '"';
+                    const rows = this.filteredJobs.map(j => [j.company, j.title, j.location, j.state, j.fit_score, j.interview_probability, this.formatSalary(j.salary_min, j.salary_max, j.currency), j.date_posted, j.sponsorship ? 'yes' : '', j.relocation_support ? 'yes' : '', j.application_friction, (j.red_flags || []).length, j.job_url].map(esc).join(','));
+                    this.download('jobs_filtered.csv', [headers.map(esc).join(','), ...rows].join('\n'), 'text/csv;charset=utf-8');
+                },
+                exportJson() {
+                    this.download('jobs_filtered.json', JSON.stringify(this.filteredJobs, null, 2), 'application/json');
+                },
+                download(name, content, type) {
+                    const blob = new Blob([content], { type });
+                    const a = document.createElement('a');
+                    a.href = URL.createObjectURL(blob);
+                    a.download = name;
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(a.href);
+                },
+
+                /* ---------- computed: filtered + sorted ---------- */
+                get filteredJobs() {
+                    let f = this.jobs.slice();
+
+                    // 1. search
+                    if (this.search.trim()) {
+                        const term = this.search.toLowerCase();
+                        f = f.filter(j => (j.title || '').toLowerCase().includes(term) || (j.company || '').toLowerCase().includes(term) || (j.location || '').toLowerCase().includes(term));
+                    }
+                    // 2. work mode multi-select
+                    if (this.modes.length) {
+                        f = f.filter(j => this.modes.includes(this.jobMode(j)));
+                    }
+                    // 3. date posted
+                    if (this.dateChip === '24h') f = f.filter(j => j.days_since_posted !== null && j.days_since_posted <= 1);
+                    if (this.dateChip === '7d') f = f.filter(j => j.days_since_posted !== null && j.days_since_posted <= 7);
+                    if (this.dateChip === '30d') f = f.filter(j => j.days_since_posted !== null && j.days_since_posted <= 30);
+                    if (this.fromDate || this.toDate) {
+                        const fd = this.daysAgo(this.fromDate);
+                        const td = this.daysAgo(this.toDate);
+                        f = f.filter(j => {
+                            if (j.days_since_posted == null) return false;
+                            if (fd != null && j.days_since_posted > fd) return false; // older than "desde"
+                            if (td != null && j.days_since_posted < td) return false; // newer than "hasta"
+                            return true;
+                        });
+                    }
+                    // 4. salary
+                    const minReq = (parseFloat(this.salMin) || 0) * 1000;
+                    const maxReq = (parseFloat(this.salMax) || Infinity) * 1000;
+                    f = f.filter(j => {
+                        if (this.withSalary && !j.salary_min && !j.salary_max) return false;
+                        const lo = j.salary_min || 0;
+                        const hi = j.salary_max || Infinity;
+                        if (hi < minReq) return false;
+                        if (lo > maxReq) return false;
+                        return true;
+                    });
+                    // 5. visa / relocation
+                    if (this.requireSponsorship) f = f.filter(j => j.sponsorship === true);
+                    if (this.requireRelocation) f = f.filter(j => j.relocation_support === true);
+                    if (this.requireUsEligible) f = f.filter(j => j.us_eligible !== false);
+                    // 6. friction
+                    if (this.frictions.length) f = f.filter(j => this.frictions.includes(j.application_friction));
+                    // 7. red flags
+                    if (this.redFlags === 'none') f = f.filter(j => !(j.red_flags || []).length);
+                    if (this.redFlags === '1+') f = f.filter(j => (j.red_flags || []).length >= 1);
+                    if (this.redFlags === '2+') f = f.filter(j => (j.red_flags || []).length >= 2);
+                    // 8. fit range
+                    f = f.filter(j => j.state !== 'EVALUATED' || ((j.fit_score || 0) >= this.fitMin && (j.fit_score || 0) <= this.fitMax));
+                    // 9. the report only surfaces EVALUATED vacancies
+                    f = f.filter(j => j.state === 'EVALUATED');
+                    // 10. application status (kanban)
+                    if (this.appFilter !== 'all') f = f.filter(j => (this.appStates[j.id] || 'apply') === this.appFilter);
+                    // 11. locations
+                    if (this.locations.length) f = f.filter(j => this.locations.includes(j.location));
+                    // 12. companies
+                    if (this.companies.length) f = f.filter(j => this.companies.includes(j.company));
+
+                    // 13. multi-level sort (by priority)
+                    const keys = (this.sortKeys && this.sortKeys.length ? this.sortKeys : [{ field: 'fit', dir: 'desc' }]);
+                    f.sort((a, b) => {
+                        for (const key of keys) {
+                            const va = this.sortValue(a, key.field);
+                            const vb = this.sortValue(b, key.field);
+                            let cmp;
+                            if (typeof va === 'string') cmp = va.localeCompare(vb);
+                            else cmp = va - vb;
+                            if (cmp !== 0) return key.dir === 'desc' ? -cmp : cmp;
+                        }
+                        return 0;
+                    });
+                    return f;
+                }
+            }
+        }
+    </script>
+</body>
+</html>

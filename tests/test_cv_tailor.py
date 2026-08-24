@@ -1,0 +1,274 @@
+import json
+import pytest
+from pathlib import Path
+from unittest.mock import patch
+
+from job_scan_mcp.services import cv_tailor
+from job_scan_mcp.services.cv_tailor import (
+    TailoredCV,
+    TailoredJob,
+    TailoredBullet,
+    generate_tailored_cv,
+    export_cv_to_pdf,
+    render_preview_html,
+    _safe_filename,
+)
+
+SAMPLE_JD = (
+    "Senior Java Backend Engineer at Stripe. Requires 6+ years building high-throughput "
+    "microservices with Java and Spring Boot on AWS (SQS, SNS, RDS). Experience with "
+    "distributed systems, canary deployments and cross-region replication."
+)
+
+
+def _base_cv():
+    return {
+        "name": "Luis Angel Gonzalez",
+        "contact": ["luis.aga215@gmail.com", "Mexico City"],
+        "summary": "Backend Engineer",
+        "experience": [
+            {
+                "title": "System Development Engineer II",
+                "company": "Amazon (Audible)",
+                "date": "Sep 2025 - Present",
+                "location": "Mexico City",
+                "bullets": [
+                    "Designed backend services for a canary deployment stage.",
+                    "Orchestrated cross-region replication of services.",
+                    "Implemented auth-token security across services.",
+                ],
+            }
+        ],
+        "education": [{"degree": "M.S. AI", "institution": "UNIR", "year": "2022"}],
+        "skills": {"Technical": ["Java", "AWS", "Spring Boot"]},
+    }
+
+
+def _mock_structured_llm(tailored: TailoredCV):
+    class _Mock:
+        def __init__(self):
+            self.last_prompt = None
+
+        def with_structured_output(self, schema):
+            return self
+
+        async def ainvoke(self, prompt):
+            self.last_prompt = prompt
+            return tailored
+
+    return _Mock()
+
+
+def _mock_playwright():
+    """Fake async playwright that records pdf() calls and creates the output file."""
+    class FakePage:
+        def __init__(self):
+            self.pdf_calls = []
+
+        async def goto(self, url):
+            self.url = url
+
+        async def pdf(self, **kwargs):
+            self.pdf_calls.append(kwargs)
+            Path(kwargs["path"]).write_bytes(b"%PDF-fake")
+
+    class FakeBrowser:
+        def __init__(self):
+            self.page = FakePage()
+
+        async def new_page(self):
+            return self.page
+
+        async def close(self):
+            pass
+
+    class FakeChromium:
+        def __init__(self):
+            self.browser = FakeBrowser()
+
+        async def launch(self):
+            return self.browser
+
+    class FakePlaywright:
+        def __init__(self):
+            self.chromium = FakeChromium()
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+    return FakePlaywright()
+
+
+# =====================================================================
+# Tool A: generate_tailored_cv
+# =====================================================================
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_generate_tailored_cv_injects_modified_flags(mock_get_llm, test_repo):
+    tailored = TailoredCV(
+        name="Luis Angel Gonzalez",
+        contact=["luis.aga215@gmail.com"],
+        summary="Senior Java backend engineer focused on AWS and microservices.",
+        experience=[
+            TailoredJob(
+                title="System Development Engineer II",
+                company="Amazon (Audible)",
+                date="Sep 2025 - Present",
+                location="Mexico City",
+                bullets=[
+                    TailoredBullet(
+                        text="Architected AWS microservices using SQS/SNS, cutting deployment blast radius by 95%.",
+                        modified=True,
+                        match_reason="JD requires microservices and AWS",
+                    ),
+                    TailoredBullet(text="Migrated 69+ packages from JDK 8 to JDK 17.", modified=False),
+                ],
+            )
+        ],
+        education=[],
+        skills={"Technical": ["Java", "AWS"]},
+    )
+    mock_get_llm.return_value = _mock_structured_llm(tailored)
+
+    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+
+    exp = data["experience"][0]
+    modified = [b for b in exp["bullets"] if b["modified"]]
+    unchanged = [b for b in exp["bullets"] if not b["modified"]]
+
+    assert len(modified) == 1
+    assert modified[0]["match_reason"] == "JD requires microservices and AWS"
+    assert unchanged[0]["match_reason"] is None
+    assert data["_meta"]["modified_bullets"] == 1
+    assert data["_meta"]["total_bullets"] == 2
+
+
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_generate_tailored_cv_requires_inputs(mock_get_llm, test_repo):
+    with pytest.raises(ValueError, match="job_description_text"):
+        await generate_tailored_cv("", _base_cv(), test_repo)
+    with pytest.raises(ValueError, match="base_cv_json"):
+        await generate_tailored_cv(SAMPLE_JD, {}, test_repo)
+
+
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_generate_tailored_cv_prompt_enforces_recruiter_standards(mock_get_llm, test_repo):
+    tailored = TailoredCV(name="Luis", contact=["a@b.c"], summary="s")
+    mock_llm = _mock_structured_llm(tailored)
+    mock_get_llm.return_value = mock_llm
+
+    await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    prompt = mock_llm.last_prompt
+
+    for required in [
+        "TN Visa Eligible",
+        "Open to US Relocation",
+        "Commissioning Engineer",
+        "Mon YYYY - Present",
+        "XYZ",
+        "[X]+ TPS",
+        "[Métrica]",
+        "Languages & Frameworks",
+        "Cloud & Infrastructure",
+        "Architecture",
+        "PRESERVE EVERY role",
+    ]:
+        assert required in prompt, f"prompt must require '{required}'"
+
+
+# =====================================================================
+# Tool B: export_cv_to_pdf
+# =====================================================================
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.async_playwright")
+async def test_export_cv_to_pdf_uses_playwright(mock_pw, test_repo, tmp_path, monkeypatch):
+    monkeypatch.setattr(cv_tailor.config, "DATA_DIR", tmp_path)
+    fake = _mock_playwright()
+    mock_pw.return_value = fake
+
+    path = await export_cv_to_pdf({"name": "Luis", "experience": []}, "My-Tailored CV")
+
+    assert path.endswith("My-Tailored_CV.pdf")
+    assert Path(path).exists()
+    browser = await fake.chromium.launch()
+    assert len(browser.page.pdf_calls) == 1
+    assert browser.page.pdf_calls[0]["path"] == path
+    # temp html cleaned up
+    assert not list((tmp_path / "cv_tailor").glob("_tmp_*.html"))
+
+
+def test_safe_filename():
+    assert _safe_filename("My-Tailored CV") == "My-Tailored_CV"
+    assert _safe_filename("cv.pdf") == "cv"
+    assert _safe_filename("") == "tailored-cv"
+
+
+def test_pdf_template_renders_bullet_dicts_and_strings():
+    from jinja2 import Template
+    html = Template(cv_tailor.PDF_TEMPLATE).render(cv={
+        "name": "Luis",
+        "contact": ["a@b.c"],
+        "summary": "s",
+        "experience": [
+            {"title": "T", "company": "C", "date": "D", "location": "L",
+             "bullets": [{"text": "modified bullet", "modified": True}, "plain bullet"]}
+        ],
+    })
+    assert "modified bullet" in html
+    assert "plain bullet" in html
+    assert 'highlight' not in html  # PDF is always clean
+
+
+# =====================================================================
+# Preview rendering
+# =====================================================================
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_render_preview_embeds_modified_flags(mock_get_llm, test_repo, tmp_path):
+    tailored = TailoredCV(
+        name="Luis", contact=["a@b.c"], summary="s",
+        experience=[TailoredJob(title="T", company="C", bullets=[
+            TailoredBullet(text="new", modified=True, match_reason="JD needs X"),
+            TailoredBullet(text="same", modified=False),
+        ])],
+    )
+    mock_get_llm.return_value = _mock_structured_llm(tailored)
+    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+
+    preview = render_preview_html(data, preview_path=tmp_path / "preview.html")
+    html = preview.read_text(encoding="utf-8")
+    assert '"modified": true' in html or '"modified":true' in html.replace(" ", "")
+    assert "match_reason" in html
+    assert "bulletCls" in html
+
+
+# =====================================================================
+# Integration: generate -> preview -> export
+# =====================================================================
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.async_playwright")
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_full_flow_generate_preview_export(mock_get_llm, mock_pw, test_repo, tmp_path, monkeypatch):
+    monkeypatch.setattr(cv_tailor.config, "DATA_DIR", tmp_path)
+
+    tailored = TailoredCV(
+        name="Luis", contact=["a@b.c"], summary="Senior Java backend engineer.",
+        experience=[TailoredJob(title="SysDev II", company="Amazon", bullets=[
+            TailoredBullet(text="AWS microservices, SQS/SNS.", modified=True, match_reason="JD requires AWS"),
+        ])],
+    )
+    mock_get_llm.return_value = _mock_structured_llm(tailored)
+    mock_pw.return_value = _mock_playwright()
+
+    data = await generate_tailored_cv(SAMPLE_JD, _base_cv(), test_repo)
+    preview = render_preview_html(data, preview_path=tmp_path / "cv_preview.html")
+    assert preview.exists()
+
+    pdf_path = await export_cv_to_pdf(data, "tailored-final")
+    assert Path(pdf_path).exists()
+    assert Path(pdf_path).suffix == ".pdf"
