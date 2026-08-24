@@ -175,7 +175,22 @@
             </div>
 
             <!-- ============ EXPLORE VIEW ============ -->
-            <div x-show="viewMode === 'explore'" x-cloak class="flex flex-col gap-5">
+            <div x-show="viewMode === 'explore'" x-cloak class="flex flex-col gap-4">
+
+            <!-- Top panel toggles (Antigravity-style) -->
+            <div class="flex items-center gap-2 border-b border-slate-800 pb-3">
+                <button @click="filtersOpen = !filtersOpen"
+                        :class="filtersOpen ? 'bg-indigo-600/20 border-indigo-500 text-indigo-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'"
+                        class="px-3 py-1.5 text-xs font-semibold border rounded-lg transition inline-flex items-center gap-1.5">
+                    <i data-lucide="sliders-horizontal" class="w-3.5 h-3.5"></i> Filters
+                </button>
+                <button @click="toggleCvPanel()"
+                        :class="cvPanelJob ? 'bg-amber-600/20 border-amber-500 text-amber-300' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'"
+                        class="px-3 py-1.5 text-xs font-semibold border rounded-lg transition inline-flex items-center gap-1.5">
+                    <i data-lucide="file-text" class="w-3.5 h-3.5"></i> CV
+                </button>
+                <span class="text-[11px] text-slate-600 ml-auto" x-text="selectedJob ? 'Viewing: ' + selectedJob.company + ' — ' + selectedJob.title : ''"></span>
+            </div>
 
             <!-- Results toolbar -->
             <div class="flex flex-wrap items-center justify-between gap-3">
@@ -205,7 +220,17 @@
             <div class="flex flex-col lg:flex-row gap-6 items-start">
 
                 <!-- ============ FILTERS LEFT RAIL ============ -->
-                <aside class="w-full lg:w-72 shrink-0 flex flex-col gap-4 bg-slate-900/40 border border-slate-800 rounded-xl p-4 sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain">
+                <!-- ============ FILTERS PANEL (left, in-flow) ============ -->
+                <aside x-show="filtersOpen" x-cloak class="w-72 shrink-0 bg-slate-900/40 border border-slate-800 rounded-xl sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain flex flex-col">
+                    <div class="flex items-center justify-between gap-3 p-4 border-b border-slate-800 shrink-0">
+                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                            <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-300"></i> Filters
+                        </h2>
+                        <button @click="filtersOpen = false" class="text-slate-400 hover:text-white transition">
+                            <i data-lucide="x" class="w-5 h-5"></i>
+                        </button>
+                    </div>
+                    <div class="p-4 flex flex-col gap-4">
 
                     <div>
                         <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Search</label>
@@ -350,13 +375,14 @@
                         </div>
                     </div>
 
+                    </div>
                 </aside>
 
                 <!-- ============ RESULTS ============ -->
                 <section class="flex-1 min-w-0 w-full flex flex-col gap-3">
 
                     <!-- Multi-level sort bar -->
-                    <div class="flex flex-wrap items-center gap-2 bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3">
+                    <div x-show="!selectedJob" class="flex flex-wrap items-center gap-2 bg-slate-900/40 border border-slate-800 rounded-xl px-4 py-3">
                         <span class="text-xs font-semibold text-slate-400 uppercase tracking-wider">Sort by:</span>
                         <template x-for="(key, i) in sortKeys" :key="i">
                             <div class="flex items-center gap-1.5">
@@ -378,18 +404,26 @@
                         </button>
                     </div>
 
+                    <!-- Back to list -->
+                    <div x-show="selectedJob" class="flex items-center gap-3">
+                        <button @click="backToList()" class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-1.5 rounded-lg transition inline-flex items-center gap-1.5">
+                            <i data-lucide="arrow-left" class="w-3.5 h-3.5"></i> Back to list
+                        </button>
+                        <span class="text-xs text-slate-500" x-text="selectedJob ? (selectedJob.company + ' — ' + selectedJob.title) : ''"></span>
+                    </div>
+
                     <!-- Empty state -->
-                    <div x-show="filteredJobs.length === 0" x-cloak class="text-center py-16 bg-slate-900/20 border border-slate-800/80 rounded-xl">
+                    <div x-show="!selectedJob && filteredJobs.length === 0" x-cloak class="text-center py-16 bg-slate-900/20 border border-slate-800/80 rounded-xl">
                         <p class="text-slate-400 font-medium">No jobs match your active filters.</p>
                     </div>
 
                     <!-- Job cards -->
-                    <template x-for="job in filteredJobs" :key="job.id">
+                    <template x-for="job in displayJobs" :key="job.id">
                         <div class="bg-slate-900/50 border rounded-xl overflow-hidden transition-all duration-200"
                              :class="expandedJob === job.id ? 'border-slate-700 ring-1 ring-slate-800' : 'border-slate-800/80 hover:border-slate-700/80'">
 
                             <!-- Header (compact row) -->
-                            <div @click="toggleExpand(job.id)" class="px-4 py-3 flex items-center gap-4 cursor-pointer select-none hover:bg-slate-800/20 transition">
+                            <div @click="selectJob(job)" class="px-4 py-3 flex items-center gap-4 cursor-pointer select-none hover:bg-slate-800/20 transition">
 
                                 <!-- Fit compact -->
                                 <div class="w-16 shrink-0 flex flex-col items-center gap-0.5">
@@ -594,6 +628,107 @@
                     </template>
 
                 </section>
+
+<!-- ============ CV TAILORING PANEL (right, in-flow) ============ -->
+        <aside x-show="cvPanelJob" x-cloak class="shrink-0 bg-slate-900/40 border border-slate-800 rounded-xl sticky top-4 flex flex-col max-h-[calc(100vh-2rem)] overflow-hidden"
+               :style="'width:' + cvWidth + 'px'">
+            <!-- Resize handle -->
+            <div class="absolute left-0 top-0 bottom-0 w-1.5 cursor-ew-resize bg-transparent hover:bg-indigo-500/40 transition" @mousedown.prevent="startCvResize($event)"></div>
+
+            <div class="flex items-start justify-between gap-3 p-4 border-b border-slate-800 shrink-0">
+                <div>
+                    <h2 class="text-sm font-bold text-white flex items-center gap-2">
+                        <i data-lucide="file-text" class="w-4 h-4 text-amber-300"></i> Adapted CV
+                    </h2>
+                    <template x-if="cvPanelJob">
+                        <div class="text-xs text-slate-400 mt-0.5 flex flex-col gap-0.5">
+                            <span class="font-semibold text-slate-300" x-text="cvPanelJob.company + ' — ' + cvPanelJob.title"></span>
+                            <span x-text="[(cvPanelJob.location || ''), 'Fit ' + (cvPanelJob.fit_score || 0) + '%'].filter(Boolean).join(' · ')"></span>
+                        </div>
+                    </template>
+                </div>
+                <button @click="closeCvPanel()" class="text-slate-400 hover:text-white transition">
+                    <i data-lucide="x" class="w-5 h-5"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 overflow-y-auto overscroll-contain p-5 flex flex-col gap-4">
+
+                <!-- ===== Already tailored: ATS preview with highlights ===== -->
+                <div x-show="cvPanelJob && cvPanelJob.tailored_cv" class="flex flex-col gap-4">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
+                            <span>Show highlights</span>
+                            <button type="button" @click="cvShowHighlights = !cvShowHighlights"
+                                    class="relative inline-flex h-5 w-9 items-center rounded-full transition"
+                                    :class="cvShowHighlights ? 'bg-amber-500' : 'bg-slate-700'">
+                                <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
+                                      :class="cvShowHighlights ? 'translate-x-4' : 'translate-x-0.5'"></span>
+                            </button>
+                        </label>
+                        <span class="text-xs text-slate-500"><span x-text="cvModifiedCount()"></span> / <span x-text="cvTotalBullets()"></span> bullets modified</span>
+                    </div>
+
+                    <button @click="cvPrintPdf()" title="Print / Save as PDF (works offline, no MCP needed)"
+                            class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5 self-start">
+                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> Download PDF
+                    </button>
+
+                    <div id="cvPrintArea" class="paper bg-white shadow-xl rounded-sm p-8 text-left">
+                        <h1 x-text="cvPanelJob.tailored_cv.name || ''"></h1>
+                        <div class="contact-info" x-text="(cvPanelJob.tailored_cv.contact || []).join('  |  ')"></div>
+                        <div class="summary" x-text="cvPanelJob.tailored_cv.summary || ''"></div>
+
+                        <div class="section-title">Experience</div>
+                        <template x-for="(job, ji) in (cvPanelJob.tailored_cv.experience || [])" :key="ji">
+                            <div>
+                                <div class="item-header"><span x-text="job.title"></span><span x-text="job.date"></span></div>
+                                <div class="item-subheader"><span x-text="job.company"></span><span x-text="job.location"></span></div>
+                                <ul>
+                                    <template x-for="(b, bi) in (job.bullets || [])" :key="bi">
+                                        <li class="bullet" :class="cvBulletCls(b)">
+                                            <span x-text="b.text"></span>
+                                            <span x-show="cvShowHighlights && b.modified && b.match_reason" class="tooltip" x-text="b.match_reason"></span>
+                                        </li>
+                                    </template>
+                                </ul>
+                            </div>
+                        </template>
+
+                        <template x-if="(cvPanelJob.tailored_cv.education || []).length">
+                            <div>
+                                <div class="section-title">Education</div>
+                                <template x-for="(edu, ei) in cvPanelJob.tailored_cv.education" :key="ei">
+                                    <div>
+                                        <div class="item-header"><span x-text="edu.degree"></span><span x-text="edu.year"></span></div>
+                                        <div class="item-subheader"><span x-text="edu.institution"></span><span></span></div>
+                                    </div>
+                                </template>
+                            </div>
+                        </template>
+
+                        <template x-if="Object.keys(cvPanelJob.tailored_cv.skills || {}).length">
+                            <div>
+                                <div class="section-title">Skills</div>
+                                <template x-for="(items, group) in cvPanelJob.tailored_cv.skills" :key="group">
+                                    <div class="skill-row"><span class="bold" x-text="group + ':'"></span><span x-text="' ' + (items || []).join(', ')"></span></div>
+                                </template>
+                            </div>
+                        </template>
+                    </div>
+                </div>
+
+                <!-- ===== Not generated yet: request state ===== -->
+                <div x-show="cvPanelJob && !cvPanelJob.tailored_cv" class="flex flex-col gap-4 text-sm text-slate-400">
+                    <p>No adapted CV generated for this job yet.</p>
+                    <p class="text-xs text-slate-500">This report is a static file, so generation runs through the assistant (MCP tool <code class="text-indigo-300">generate_tailored_cv</code>) or automatically during deep evaluation. Ask the assistant, then regenerate the report to preview it here.</p>
+                    <button @click="cvCopyRequest()" class="self-start bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-300 text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5">
+                        <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy request for assistant
+                    </button>
+                    <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3 max-h-40 overflow-y-auto overscroll-contain text-xs text-slate-500 whitespace-pre-line" x-text="cvPanelJob.description"></div>
+                </div>
+            </div>
+        </aside>
             </div>
 
             </div>
@@ -724,108 +859,7 @@
             </div>
         </aside>
 
-        <!-- ============ CV TAILORING MODAL (offline preview) ============ -->
-        <div x-show="cvPanelJob" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="closeCvPanel()">
-            <div class="bg-slate-900 border border-slate-800 rounded-xl shadow-2xl w-full max-w-3xl max-h-[92vh] flex flex-col overflow-hidden">
-
-                <!-- Header -->
-                <div class="flex items-start justify-between gap-3 p-4 border-b border-slate-800">
-                    <div>
-                        <h2 class="text-sm font-bold text-white flex items-center gap-2">
-                            <i data-lucide="file-text" class="w-4 h-4 text-amber-300"></i> Adapted CV
-                        </h2>
-                        <template x-if="cvPanelJob">
-                            <p class="text-xs text-slate-400 mt-0.5" x-text="cvPanelJob.company + ' — ' + cvPanelJob.title"></p>
-                        </template>
-                    </div>
-                    <button @click="closeCvPanel()" class="text-slate-400 hover:text-white transition">
-                        <i data-lucide="x" class="w-5 h-5"></i>
-                    </button>
-                </div>
-
-                <!-- Body -->
-                <div class="overflow-y-auto overscroll-contain p-5 flex flex-col gap-4">
-
-                    <!-- ===== Already tailored: ATS preview with highlights ===== -->
-                    <div x-show="cvPanelJob && cvPanelJob.tailored_cv" class="flex flex-col gap-4">
-                        <div class="flex flex-wrap items-center justify-between gap-2">
-                            <label class="flex items-center gap-2 text-xs text-slate-300 cursor-pointer bg-slate-950 border border-slate-800 rounded-lg px-3 py-2">
-                                <span>Show highlights</span>
-                                <button type="button" @click="cvShowHighlights = !cvShowHighlights"
-                                        class="relative inline-flex h-5 w-9 items-center rounded-full transition"
-                                        :class="cvShowHighlights ? 'bg-amber-500' : 'bg-slate-700'">
-                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition"
-                                          :class="cvShowHighlights ? 'translate-x-4' : 'translate-x-0.5'"></span>
-                                </button>
-                            </label>
-                            <span class="text-xs text-slate-500"><span x-text="cvModifiedCount()"></span> / <span x-text="cvTotalBullets()"></span> bullets modified</span>
-                        </div>
-
-                        <div class="flex flex-wrap items-center gap-2">
-                            <button @click="cvPrintPdf()" title="Print / Save as PDF (works offline, no MCP needed)"
-                                    class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5">
-                                <i data-lucide="printer" class="w-3.5 h-3.5"></i> Download PDF
-                            </button>
-                            <button @click="cvDownloadJson()" class="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-2 rounded-lg transition">JSON</button>
-                            <button @click="cvDownloadCleanHtml()" class="bg-slate-950 hover:bg-slate-800 border border-slate-800 text-slate-300 text-xs font-semibold px-3 py-2 rounded-lg transition">HTML</button>
-                        </div>
-
-                        <div id="cvPrintArea" class="paper bg-white shadow-xl rounded-sm p-8 text-left">
-                            <h1 x-text="cvPanelJob.tailored_cv.name || ''"></h1>
-                            <div class="contact-info" x-text="(cvPanelJob.tailored_cv.contact || []).join('  |  ')"></div>
-                            <div class="summary" x-text="cvPanelJob.tailored_cv.summary || ''"></div>
-
-                            <div class="section-title">Experience</div>
-                            <template x-for="(job, ji) in (cvPanelJob.tailored_cv.experience || [])" :key="ji">
-                                <div>
-                                    <div class="item-header"><span x-text="job.title"></span><span x-text="job.date"></span></div>
-                                    <div class="item-subheader"><span x-text="job.company"></span><span x-text="job.location"></span></div>
-                                    <ul>
-                                        <template x-for="(b, bi) in (job.bullets || [])" :key="bi">
-                                            <li class="bullet" :class="cvBulletCls(b)">
-                                                <span x-text="b.text"></span>
-                                                <span x-show="cvShowHighlights && b.modified && b.match_reason" class="tooltip" x-text="b.match_reason"></span>
-                                            </li>
-                                        </template>
-                                    </ul>
-                                </div>
-                            </template>
-
-                            <template x-if="(cvPanelJob.tailored_cv.education || []).length">
-                                <div>
-                                    <div class="section-title">Education</div>
-                                    <template x-for="(edu, ei) in cvPanelJob.tailored_cv.education" :key="ei">
-                                        <div>
-                                            <div class="item-header"><span x-text="edu.degree"></span><span x-text="edu.year"></span></div>
-                                            <div class="item-subheader"><span x-text="edu.institution"></span><span></span></div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
-
-                            <template x-if="Object.keys(cvPanelJob.tailored_cv.skills || {}).length">
-                                <div>
-                                    <div class="section-title">Skills</div>
-                                    <template x-for="(items, group) in cvPanelJob.tailored_cv.skills" :key="group">
-                                        <div class="skill-row"><span class="bold" x-text="group + ':'"></span><span x-text="' ' + (items || []).join(', ')"></span></div>
-                                    </template>
-                                </div>
-                            </template>
-                        </div>
-                    </div>
-
-                    <!-- ===== Not generated yet: request state ===== -->
-                    <div x-show="cvPanelJob && !cvPanelJob.tailored_cv" class="flex flex-col gap-4 text-sm text-slate-400">
-                        <p>No adapted CV generated for this job yet.</p>
-                        <p class="text-xs text-slate-500">This report is a static file, so generation runs through the assistant (MCP tool <code class="text-indigo-300">generate_tailored_cv</code>) or automatically during deep evaluation. Ask the assistant, then regenerate the report to preview it here.</p>
-                        <button @click="cvCopyRequest()" class="self-start bg-amber-600/20 hover:bg-amber-600/30 border border-amber-600/40 text-amber-300 text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5">
-                            <i data-lucide="copy" class="w-3.5 h-3.5"></i> Copy request for assistant
-                        </button>
-                        <div class="bg-slate-950/60 border border-slate-800 rounded-lg p-3 max-h-40 overflow-y-auto overscroll-contain text-xs text-slate-500 whitespace-pre-line" x-text="cvPanelJob.description"></div>
-                    </div>
-                </div>
-            </div>
-        </div>
+        
 
         <!-- ============ CONFIRM ARCHIVE / RESTORE MODAL ============ -->
         <div x-show="pendingAction" x-cloak class="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm" @click.self="cancelAction()">
@@ -889,14 +923,17 @@
                 sortKeys: [{ field: 'fit', dir: 'desc' }],
                 // ui
                 expandedJob: null,
+                selectedJob: null,
                 appStates: {},
                 appStateUpdatedAt: {},
                 viewMode: 'explore',
                 appliedStatus: 'all',
+                filtersOpen: true,
                 showReports: false,
                 pendingAction: null,
                 cvPanelJob: null,
                 cvShowHighlights: true,
+                cvWidth: 544,
                 reportsManifest: window.reportsManifest || [],
                 currentReport: window.currentReport || {},
                 themeMode: 'system',
@@ -1028,6 +1065,7 @@
                 },
                 get showingCount() { return this.filteredJobs.length; },
                 get evaluatedTotal() { return this.jobs.filter(j => j.state === 'EVALUATED').length; },
+                get displayJobs() { return this.selectedJob ? [this.selectedJob] : this.filteredJobs; },
                 get avgFitFiltered() {
                     const ev = this.filteredJobs.filter(j => j.state === 'EVALUATED' && j.fit_score);
                     if (!ev.length) return 0;
@@ -1109,7 +1147,52 @@
                     this.$nextTick(() => lucide.createIcons());
                 },
                 closeCvPanel() { this.cvPanelJob = null; },
-                cvPrintPdf() { window.print(); },
+                toggleCvPanel() {
+                    if (this.cvPanelJob) { this.cvPanelJob = null; return; }
+                    const target = (this.selectedJob && this.selectedJob.tailored_cv) ? this.selectedJob
+                        : this.jobs.find(j => j.state === 'EVALUATED' && j.tailored_cv)
+                          || this.jobs.find(j => j.state === 'EVALUATED');
+                    this.cvPanelJob = target || null;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                cvPrintPdf() {
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return;
+                    let frame = document.getElementById('cvPrintFrame');
+                    if (!frame) {
+                        frame = document.createElement('iframe');
+                        frame.id = 'cvPrintFrame';
+                        frame.setAttribute('aria-hidden', 'true');
+                        frame.style.position = 'fixed';
+                        frame.style.right = '0';
+                        frame.style.bottom = '0';
+                        frame.style.width = '0';
+                        frame.style.height = '0';
+                        frame.style.border = '0';
+                        document.body.appendChild(frame);
+                    }
+                    const doc = frame.contentWindow.document;
+                    doc.open();
+                    doc.write(this.buildCleanHtml(cv));
+                    doc.close();
+                    frame.contentWindow.focus();
+                    setTimeout(() => frame.contentWindow.print(), 300);
+                },
+                startCvResize(e) {
+                    e.preventDefault();
+                    const startX = e.clientX;
+                    const startW = this.cvWidth;
+                    const move = (ev) => {
+                        const w = startW + (startX - ev.clientX);
+                        this.cvWidth = Math.max(360, Math.min(960, Math.round(w)));
+                    };
+                    const up = () => {
+                        window.removeEventListener('mousemove', move);
+                        window.removeEventListener('mouseup', up);
+                    };
+                    window.addEventListener('mousemove', move);
+                    window.addEventListener('mouseup', up);
+                },
                 cvModifiedCount() {
                     const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
                     if (!cv) return 0;
@@ -1122,16 +1205,6 @@
                 },
                 cvBulletCls(b) {
                     return this.cvShowHighlights && b.modified ? 'highlighted' : '';
-                },
-                cvDownloadJson() {
-                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
-                    if (!cv) return;
-                    this.download('tailored_cv.json', JSON.stringify(cv, null, 2), 'application/json');
-                },
-                cvDownloadCleanHtml() {
-                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
-                    if (!cv) return;
-                    this.download('tailored_cv.html', this.buildCleanHtml(cv), 'text/html;charset=utf-8');
                 },
                 cvCopyRequest() {
                     const job = this.cvPanelJob;
@@ -1170,6 +1243,15 @@
                 toggleExpand(jobId) {
                     this.expandedJob = this.expandedJob === jobId ? null : jobId;
                     this.$nextTick(() => lucide.createIcons());
+                },
+                selectJob(job) {
+                    this.selectedJob = job;
+                    this.expandedJob = job.id;
+                    this.$nextTick(() => lucide.createIcons());
+                },
+                backToList() {
+                    this.selectedJob = null;
+                    this.expandedJob = null;
                 },
                 getScoreColorClass(score) {
                     if (score >= 85) return 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400';
@@ -1281,15 +1363,15 @@
                     const skills = Object.entries(cv.skills || {}).map(([g, items]) =>
                         `<div class="skill-row"><span class="bold">${esc(g)}:</span> ${esc((items || []).join(', '))}</div>`).join('');
                     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
-@page{margin:0.5in}
-body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111;line-height:1.3;font-size:10.5pt}
-h1{font-size:20pt;text-align:center;margin-bottom:4px;font-weight:normal}
-.contact-info{text-align:center;font-size:9.5pt;margin-bottom:15px;color:#333}
-.section-title{font-size:12pt;text-transform:uppercase;border-bottom:1px solid #000;margin-top:12px;margin-bottom:8px;font-weight:bold}
-.item-header{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:2px}
-.item-subheader{display:flex;justify-content:space-between;font-style:italic;margin-bottom:4px;font-size:10pt}
-ul{margin-top:0;padding-left:20px;margin-bottom:12px}li{margin-bottom:3px}
-.summary{margin-bottom:12px;font-size:10pt}.skill-row{margin-bottom:4px;font-size:10pt}.bold{font-weight:bold}
+@page{margin:0.4in}
+body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111;line-height:1.25;font-size:10pt}
+h1{font-size:18pt;text-align:center;margin:0 0 2px;font-weight:normal}
+.contact-info{text-align:center;font-size:9pt;margin:0 0 10px;color:#333}
+.section-title{font-size:11pt;text-transform:uppercase;border-bottom:1px solid #000;margin-top:8px;margin-bottom:6px;font-weight:bold}
+.item-header{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:1px}
+.item-subheader{display:flex;justify-content:space-between;font-style:italic;margin-bottom:2px;font-size:9.5pt}
+ul{margin-top:0;padding-left:18px;margin-bottom:8px}li{margin-bottom:2px}
+.summary{margin:0 0 8px;font-size:9.5pt}.skill-row{margin-bottom:2px;font-size:9.5pt}.bold{font-weight:bold}
 </style></head><body>
 <h1>${esc(cv.name)}</h1>
 <div class="contact-info">${esc((cv.contact || []).join(' | '))}</div>

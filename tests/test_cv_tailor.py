@@ -13,6 +13,7 @@ from job_scan_mcp.services.cv_tailor import (
     export_cv_to_pdf,
     render_preview_html,
     _safe_filename,
+    _strip_placeholders,
 )
 from job_scan_mcp.models import ParsedProfile, ProfileJob
 
@@ -151,8 +152,12 @@ async def test_generate_tailored_cv_injects_modified_flags(mock_get_llm, test_re
 @pytest.mark.asyncio
 @patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
 async def test_build_tailored_cv_data_requires_inputs(mock_get_llm, test_repo):
-    with pytest.raises(ValueError, match="job_description_text"):
-        await build_tailored_cv_data("", _base_cv(), test_repo)
+    # Empty JD is tolerated: returns the base CV unchanged (no fabricated changes)
+    data = await build_tailored_cv_data("", _base_cv(), test_repo)
+    assert data["_meta"]["modified_bullets"] == 0
+    assert len(data["experience"]) == len(_base_cv()["experience"])
+
+    # Empty base CV is still an error
     with pytest.raises(ValueError, match="base_cv_json"):
         await build_tailored_cv_data(SAMPLE_JD, {}, test_repo)
 
@@ -173,14 +178,39 @@ async def test_generate_tailored_cv_prompt_enforces_recruiter_standards(mock_get
         "Commissioning Engineer",
         "Mon YYYY - Present",
         "XYZ",
-        "[X]+ TPS",
-        "[Métrica]",
+        "NEVER use placeholders",
+        "[X]%",
         "Languages & Frameworks",
         "Cloud & Infrastructure",
         "Architecture",
         "PRESERVE EVERY role",
     ]:
         assert required in prompt, f"prompt must require '{required}'"
+
+
+def test_strip_placeholders_removes_metric_placeholders():
+    assert _strip_placeholders("Cut latency by [X]% across services.") == "Cut latency by across services."
+    assert _strip_placeholders("Managing [X]+ TPS for canary deployments.") == "Managing for canary deployments."
+    assert _strip_placeholders("Reduced [Métrica] by [X].") == "Reduced by."
+    assert _strip_placeholders("Plain bullet, no placeholders.") == "Plain bullet, no placeholders."
+
+
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.cv_tailor.get_llm_for_stage")
+async def test_build_tailored_cv_data_strips_placeholders_from_output(mock_get_llm, test_repo):
+    tailored = TailoredCV(
+        name="Luis",
+        contact=["a@b.c"],
+        summary="s",
+        experience=[TailoredJob(title="SysDev II", company="Amazon", bullets=[
+            TailoredBullet(text="Cut latency by [X]% and managed [X]+ TPS.", modified=True, match_reason="JD wants metrics"),
+        ])],
+    )
+    mock_get_llm.return_value = _mock_structured_llm(tailored)
+    data = await build_tailored_cv_data(SAMPLE_JD, _base_cv(), test_repo)
+    bullet = data["experience"][0]["bullets"][0]
+    assert "[X]" not in bullet["text"]
+    assert "TPS" not in bullet["text"]
 
 
 # =====================================================================

@@ -86,6 +86,17 @@ class TailoredCV(BaseModel):
     skills: Dict[str, List[str]] = Field(default_factory=dict)
 
 
+def _strip_placeholders(text: str) -> str:
+    """Remove metric placeholders like '[X]%', '[X]+ TPS', '[Métrica]' so the CV is ready to send."""
+    if not text:
+        return text
+    pat = re.compile(r"\[[^\]]{1,40}\]\s*(?:%|\+\s*[A-Za-zÁ-ú]+)?")
+    cleaned = pat.sub("", text)
+    cleaned = re.sub(r"\s+", " ", cleaned)              # collapse whitespace
+    cleaned = re.sub(r"\s+([.,;:!?])", r"\1", cleaned)  # attach dangling punctuation
+    return cleaned.strip()
+
+
 # =====================================================================
 # Tool A: LLM inference / adaptation (reusable by the MCP tool and the pipeline)
 # =====================================================================
@@ -103,7 +114,21 @@ async def build_tailored_cv_data(
     never invented; it is only reframed, reordered and emphasized.
     """
     if not job_description_text or not job_description_text.strip():
-        raise ValueError("job_description_text cannot be empty.")
+        # No JD to adapt against: return the base CV unchanged (no fabricated changes).
+        data = {
+            "name": base_cv_json.get("name", ""),
+            "contact": list(base_cv_json.get("contact") or []),
+            "summary": base_cv_json.get("summary", ""),
+            "experience": list(base_cv_json.get("experience") or []),
+            "education": list(base_cv_json.get("education") or []),
+            "skills": dict(base_cv_json.get("skills") or {}),
+        }
+        data["_meta"] = {
+            "modified_bullets": 0,
+            "total_bullets": sum(len(j.get("bullets", [])) for j in data["experience"]),
+            "generated_at": datetime.now().isoformat(timespec="seconds"),
+        }
+        return data
     if not base_cv_json:
         raise ValueError("base_cv_json cannot be empty.")
 
@@ -127,9 +152,9 @@ async def build_tailored_cv_data(
         "2. PRESERVE EVERY role in the base CV - never omit or drop any experience entry (e.g. keep the Dematic "
         "Commissioning Engineer role so continuous tenure ~6.8 years is reflected). Do not change employers or date spans.\n"
         "3. DATES: unify strictly to 'Mon YYYY - Mon YYYY' or 'Mon YYYY - Present' (e.g. 'Sep 2025 - Present', 'Jul 2024 - Sep 2025').\n"
-        "4. BULLETS: always use XYZ format (Accomplished X, measured by Y, by doing Z). Where exact numbers are missing, "
-        "inject placeholders like '[X]%', '[X]+ TPS', '[Métrica]' for the candidate to fill. Every bullet must be a bullet "
-        "item, never free text.\n"
+        "4. BULLETS: always use XYZ format (Accomplished X, measured by Y, by doing Z). NEVER use "
+        "placeholders like '[X]%', '[X]+ TPS' or '[Métrica]' - write complete, ready-to-send bullets "
+        "using the concrete facts available. Every bullet must be a bullet item, never free text.\n"
         "5. Rewrite bullets that address JD requirements; set 'modified': true with a 'match_reason' referencing the JD "
         "requirement. Keep bullets that still fit as-is with 'modified': false and no match_reason.\n"
         "6. HEADER: format location as 'Mexico City, MX (Open to US Relocation / TN Visa Eligible)'. Include LinkedIn and "
@@ -145,9 +170,10 @@ async def build_tailored_cv_data(
     except Exception as e:
         raise RuntimeError(f"LLM failed to tailor CV: {e}") from e
 
-    # Ensure metadata integrity on every bullet
+    # Ensure metadata integrity on every bullet + strip any metric placeholders (ready to send)
     for job in result.experience:
         for bullet in job.bullets:
+            bullet.text = _strip_placeholders(bullet.text)
             if bullet.modified and not bullet.match_reason:
                 bullet.match_reason = "Reworded to emphasize alignment with the job description."
 
@@ -194,18 +220,18 @@ PDF_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 0.5in; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; line-height: 1.3; font-size: 10.5pt; }
-        h1 { font-size: 20pt; text-align: center; margin-bottom: 4px; font-weight: normal; }
-        .contact-info { text-align: center; font-size: 9.5pt; margin-bottom: 15px; color: #333; }
-        .section-title { font-size: 12pt; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 12px; margin-bottom: 8px; font-weight: bold; }
-        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 2px; }
-        .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 4px; font-size: 10pt;}
-        ul { margin-top: 0; padding-left: 20px; margin-bottom: 12px; }
-        li { margin-bottom: 3px; }
-        .summary { margin-bottom: 12px; font-size: 10pt; }
-        .skills-container { margin-bottom: 10px; }
-        .skill-row { margin-bottom: 4px; font-size: 10pt; }
+        @page { margin: 0.4in; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; line-height: 1.25; font-size: 10pt; }
+        h1 { font-size: 18pt; text-align: center; margin: 0 0 2px; font-weight: normal; }
+        .contact-info { text-align: center; font-size: 9pt; margin: 0 0 10px; color: #333; }
+        .section-title { font-size: 11pt; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 8px; margin-bottom: 6px; font-weight: bold; }
+        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 1px; }
+        .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 2px; font-size: 9.5pt;}
+        ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
+        li { margin-bottom: 2px; }
+        .summary { margin: 0 0 8px; font-size: 9.5pt; }
+        .skills-container { margin-bottom: 8px; }
+        .skill-row { margin-bottom: 2px; font-size: 9.5pt; }
         .bold { font-weight: bold; }
     </style>
 </head>
