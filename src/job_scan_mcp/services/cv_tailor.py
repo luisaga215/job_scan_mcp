@@ -97,6 +97,50 @@ def _strip_placeholders(text: str) -> str:
     return cleaned.strip()
 
 
+def _base_cv_blob(base_cv_json: dict) -> str:
+    """Concatenate all base-CV text (summary, skills, bullets) so grounded additions can be allowed."""
+    parts = [str(base_cv_json.get("summary") or "")]
+    for items in (base_cv_json.get("skills") or {}).values():
+        parts.extend(str(s) for s in (items or []))
+    for exp in base_cv_json.get("experience") or []:
+        for b in exp.get("bullets") or []:
+            parts.append(b if isinstance(b, str) else str(b.get("text", "")))
+    return " ".join(parts).lower()
+
+
+def _filter_fabricated_skills(skills: dict, base_blob: str) -> dict:
+    """Keep skills/tech grounded in the base CV; drop anything the LLM invented.
+
+    The LLM may surface and re-emphasize anything that already appears anywhere in the
+    candidate's CV (skills, summary or bullets), but may not introduce new technologies.
+    """
+    out = {}
+    for group, items in (skills or {}).items():
+        kept = []
+        for item in (items or []):
+            core = re.sub(r"\(.*?\)", "", str(item)).lower().strip()
+            if core and re.search(r"\b" + re.escape(core) + r"\b", base_blob):
+                kept.append(item)
+        if kept:
+            out[group] = kept
+    return out
+
+
+def _filter_contact(contact: list, base_contact: list) -> list:
+    """Drop invented social links / placeholders; keep the base contact plus allowed location strings."""
+    out = []
+    for c in (contact or []):
+        cl = str(c).lower()
+        if any(tok in cl for tok in ("linkedin", "github", "placeholder", "[", "]")):
+            continue
+        out.append(c)
+    # Always include the base contact entries (email, location, ...) if missing
+    for b in (base_contact or []):
+        if b not in out:
+            out.insert(0, b)
+    return out
+
+
 # =====================================================================
 # Tool A: LLM inference / adaptation (reusable by the MCP tool and the pipeline)
 # =====================================================================
@@ -159,8 +203,13 @@ async def build_tailored_cv_data(
         "requirement. Keep bullets that still fit as-is with 'modified': false and no match_reason.\n"
         "6. HEADER: format location as 'Mexico City, MX (Open to US Relocation / TN Visa Eligible)'. Include LinkedIn and "
         "GitHub placeholders in contact.\n"
-        "7. SKILLS: restructure into exactly 3 categories: 'Languages & Frameworks', 'Cloud & Infrastructure', 'Architecture'.\n"
-        "8. Adjust the summary to echo the JD's keywords, and return the complete CV structure (name, contact, summary, "
+        "7. SKILLS: restructure into exactly 3 categories: 'Languages & Frameworks', 'Cloud & Infrastructure', 'Architecture'. "
+        "Use ONLY skills/technologies that already appear in the base CV - NEVER add a technology that is not there (no Docker, "
+        "Kubernetes, Kafka, Terraform, TypeScript, .NET, etc. unless present in the base CV).\n"
+        "8. CONTACT: use only the base CV's contact info. NEVER invent LinkedIn/GitHub URLs or other profiles.\n"
+        "9. Preserve every numeric metric from the base CV verbatim (e.g., '69+ packages', '15+ services', '10+ core services'); "
+        "do not drop or round numbers.\n"
+        "10. Adjust the summary to echo the JD's keywords, and return the complete CV structure (name, contact, summary, "
         "experience, education, skills).\n"
         "Output the JSON object conforming to the provided schema."
     )
@@ -176,6 +225,11 @@ async def build_tailored_cv_data(
             bullet.text = _strip_placeholders(bullet.text)
             if bullet.modified and not bullet.match_reason:
                 bullet.match_reason = "Reworded to emphasize alignment with the job description."
+
+    # Deterministic guard: never let the LLM fabricate skills or social profiles,
+    # but allow it to surface anything already grounded in the base CV.
+    result.skills = _filter_fabricated_skills(result.skills, _base_cv_blob(base_cv_json))
+    result.contact = _filter_contact(result.contact, base_cv_json.get("contact") or [])
 
     data = result.model_dump()
     modified_count = sum(
@@ -220,19 +274,19 @@ PDF_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 0.4in; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; line-height: 1.25; font-size: 10pt; }
-        h1 { font-size: 18pt; text-align: center; margin: 0 0 2px; font-weight: normal; }
-        .contact-info { text-align: center; font-size: 9pt; margin: 0 0 10px; color: #333; }
-        .section-title { font-size: 11pt; text-transform: uppercase; border-bottom: 1px solid #000; margin-top: 8px; margin-bottom: 6px; font-weight: bold; }
-        .item-header { display: flex; justify-content: space-between; font-weight: bold; margin-bottom: 1px; }
-        .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 2px; font-size: 9.5pt;}
-        ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
-        li { margin-bottom: 2px; }
-        .summary { margin: 0 0 8px; font-size: 9.5pt; }
+        @page { margin: 0.45in; }
+        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; line-height: 1.34; font-size: 10.5pt; }
+        h1 { font-size: 20pt; text-align: center; margin: 0 0 3px; font-weight: 600; letter-spacing: 0.3px; }
+        .contact-info { text-align: center; font-size: 9.5pt; margin: 0 0 14px; color: #333; }
+        .section-title { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1.5px solid #000; margin-top: 14px; margin-bottom: 8px; font-weight: 700; }
+        .item-header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 1px; }
+        .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 3px; font-size: 10pt;}
+        ul { margin-top: 0; padding-left: 18px; margin-bottom: 10px; }
+        li { margin-bottom: 3px; }
+        .summary { margin: 0 0 10px; font-size: 10.5pt; }
         .skills-container { margin-bottom: 8px; }
-        .skill-row { margin-bottom: 2px; font-size: 9.5pt; }
-        .bold { font-weight: bold; }
+        .skill-row { margin-bottom: 3px; font-size: 10.5pt; }
+        .bold { font-weight: 700; }
     </style>
 </head>
 <body>

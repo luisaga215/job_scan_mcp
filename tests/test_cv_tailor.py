@@ -265,6 +265,33 @@ def test_build_base_cv_from_profile_none():
     assert build_base_cv_from_profile(None) == {}
 
 
+def test_filter_fabricated_skills():
+    blob = "java spring boot aws postgres rds ec2 s3 sqs sns iam privatelink security"
+    skills = {
+        "Languages & Frameworks": ["Java", "Spring Boot", "Python", "Go"],
+        "Cloud & Infrastructure": ["AWS", "Docker", "Kubernetes", "RDS", "IAM"],
+        "Architecture": ["Microservices", "Event Sourcing"],
+    }
+    out = cv_tailor._filter_fabricated_skills(skills, blob)
+    assert "Java" in out["Languages & Frameworks"]
+    assert "Python" not in out["Languages & Frameworks"]
+    assert "Go" not in out["Languages & Frameworks"]
+    assert "AWS" in out["Cloud & Infrastructure"]
+    assert "RDS" in out["Cloud & Infrastructure"]
+    assert "IAM" in out["Cloud & Infrastructure"]  # grounded in the CV
+    assert "Docker" not in out["Cloud & Infrastructure"]
+    assert "Microservices" not in out.get("Architecture", [])
+
+
+def test_filter_contact_drops_fabricated_social():
+    base = ["luis@example.com", "Mexico City, MX"]
+    contact = ["luis@example.com", "LinkedIn: linkedin.com/in/x", "GitHub: github.com/x", "Mexico City, MX (Open to US Relocation)"]
+    out = cv_tailor._filter_contact(contact, base)
+    assert "luis@example.com" in out
+    assert not any("linkedin.com" in c.lower() or "github.com" in c.lower() for c in out)
+    assert any("Mexico City" in c for c in out)
+
+
 def test_pdf_template_renders_bullet_dicts_and_strings():
     from jinja2 import Template
     html = Template(cv_tailor.PDF_TEMPLATE).render(cv={
