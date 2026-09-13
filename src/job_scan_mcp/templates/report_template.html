@@ -682,10 +682,10 @@
                         <span class="text-xs text-slate-500"><span x-text="cvModifiedCount()"></span> / <span x-text="cvTotalBullets()"></span> bullets modified</span>
                     </div>
 
-                    <button @click="cvPrintPdf()" title="Print / Save as PDF (works offline, no MCP needed)"
-                            class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5 self-start">
-                        <i data-lucide="printer" class="w-3.5 h-3.5"></i> Download PDF
-                    </button>
+                        <button @click="cvPrintPdf()" title="Generate a clean PDF via the assistant (export_cv_to_pdf)"
+                                class="bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold px-3 py-2 rounded-lg transition inline-flex items-center gap-1.5 self-start">
+                            <i data-lucide="printer" class="w-3.5 h-3.5"></i> Download PDF
+                        </button>
 
                     <div id="cvPrintArea" class="paper bg-white shadow-xl rounded-sm p-8 text-left">
                         <h1 x-text="(cvPanelJob.tailored_cv.name || '').toUpperCase()"></h1>
@@ -1172,22 +1172,11 @@
                     this.$nextTick(() => lucide.createIcons());
                 },
                 cvPrintPdf() {
-                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
-                    if (!cv) return;
-                    let frame = document.getElementById('cvPrintFrame');
-                    if (!frame) {
-                        frame = document.createElement('iframe');
-                        frame.id = 'cvPrintFrame';
-                        frame.setAttribute('aria-hidden', 'true');
-                        frame.style.cssText = 'position:fixed;left:-10000px;top:0;width:8.5in;height:11in;border:0;';
-                        document.body.appendChild(frame);
-                    }
-                    const doc = frame.contentWindow.document;
-                    doc.open();
-                    doc.write(this.buildCleanHtml(cv));
-                    doc.close();
-                    frame.contentWindow.focus();
-                    setTimeout(() => { frame.contentWindow.print(); }, 400);
+                    const job = this.cvPanelJob;
+                    if (!job) return;
+                    const text = `export_cv_to_pdf for: ${job.company} — ${job.title} (job_id: ${job.id})`;
+                    this.copyText(text);
+                    this.$dispatch('toast', "Copied. Ask the assistant to run export_cv_to_pdf — it generates a clean 1-page PDF (no browser header/footer).");
                 },
                 startCvResize(e) {
                     e.preventDefault();
