@@ -274,19 +274,19 @@ PDF_TEMPLATE = """<!DOCTYPE html>
 <head>
     <meta charset="UTF-8">
     <style>
-        @page { margin: 0.45in; }
-        body { font-family: 'Helvetica Neue', Helvetica, Arial, sans-serif; color: #111; line-height: 1.34; font-size: 10.5pt; }
-        h1 { font-size: 20pt; text-align: center; margin: 0 0 3px; font-weight: 600; letter-spacing: 0.3px; }
-        .contact-info { text-align: center; font-size: 9.5pt; margin: 0 0 14px; color: #333; }
-        .section-title { font-size: 11.5pt; text-transform: uppercase; letter-spacing: 0.6px; border-bottom: 1.5px solid #000; margin-top: 14px; margin-bottom: 8px; font-weight: 700; }
-        .item-header { display: flex; justify-content: space-between; font-weight: 700; margin-bottom: 1px; }
-        .item-subheader { display: flex; justify-content: space-between; font-style: italic; margin-bottom: 3px; font-size: 10pt;}
-        ul { margin-top: 0; padding-left: 18px; margin-bottom: 10px; }
-        li { margin-bottom: 3px; }
-        .summary { margin: 0 0 10px; font-size: 10.5pt; }
-        .skills-container { margin-bottom: 8px; }
-        .skill-row { margin-bottom: 3px; font-size: 10.5pt; }
-        .bold { font-weight: 700; }
+        @page { margin: 0.5in; }
+        body { font-family: 'Times New Roman', Times, serif; color: #111; line-height: 1.3; font-size: 10pt; }
+        h1 { font-size: 18pt; text-align: center; margin: 0 0 4px; font-weight: bold; }
+        .contact-info { text-align: center; font-size: 9pt; margin: 0 0 12px; color: #111; }
+        .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; margin-top: 12px; margin-bottom: 6px; }
+        .item-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
+        .item-subheader { display: flex; justify-content: space-between; font-style: italic; font-size: 9pt; margin-bottom: 3px; }
+        ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
+        li { margin-bottom: 2px; }
+        .summary { margin: 0 0 8px; font-size: 10pt; }
+        .skills-container { margin-bottom: 6px; }
+        .skill-row { margin-bottom: 2px; font-size: 10pt; }
+        .bold { font-weight: bold; }
     </style>
 </head>
 <body>
