@@ -55,8 +55,8 @@ async def parse_and_sync_cv(file_path: str, repo: JobRepository) -> UserProfile:
     
     prompt = (
         "You are an expert HR and recruitment assistant. Parse the following candidate resume text "
-        "and extract a structured profile with candidate details, skills, core tech stack, "
-        "experience years, education, estimated seniority, and a brief professional summary.\n"
+        "and extract a structured profile with candidate details (name, email, phone, LinkedIn URL), "
+        "skills, core tech stack, experience years, education, estimated seniority, and a brief professional summary.\n"
         "IMPORTANT: also extract the 'experience' list — each role with title, company, dates "
         "(e.g. 'Sep 2025 - Present'), location, and ALL of its achievement bullets VERBATIM from the "
         "resume. Do not summarize, omit, merge or truncate any bullet - keep every bullet the resume has.\n\n"

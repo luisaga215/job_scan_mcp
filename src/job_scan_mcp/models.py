@@ -1,6 +1,6 @@
 import json
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, Dict
 from pydantic import BaseModel, Field as PydanticField
 from sqlmodel import Field, SQLModel
 
@@ -19,7 +19,10 @@ class ProfileJob(BaseModel):
 class ParsedProfile(BaseModel):
     name: Optional[str] = PydanticField(None, description="The candidate's full name")
     email: Optional[str] = PydanticField(None, description="The candidate's email address")
+    phone: Optional[str] = PydanticField(None, description="The candidate's phone number")
+    linkedin: Optional[str] = PydanticField(None, description="The candidate's LinkedIn profile URL")
     skills: List[str] = PydanticField(default_factory=list, description="List of technical skills and tools")
+    skills_categories: Dict[str, List[str]] = PydanticField(default_factory=dict, description="Skills grouped into named categories (e.g. Engineering & Development, Cloud & Infrastructure)")
     core_stack: List[str] = PydanticField(default_factory=list, description="Primary languages, frameworks, or cloud providers (e.g., Python, AWS)")
     experience_years: float = PydanticField(0.0, description="Total years of professional software engineering experience")
     seniority_level: str = PydanticField("Mid", description="Estimated seniority level (e.g., Junior, Mid, Senior, Lead, Principal, Staff)")

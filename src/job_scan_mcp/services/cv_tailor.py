@@ -30,8 +30,12 @@ def build_base_cv_from_profile(profile) -> dict:
     if profile is None:
         return {}
     contact = []
+    if profile.phone:
+        contact.append(profile.phone)
     if profile.email:
         contact.append(profile.email)
+    if profile.linkedin:
+        contact.append(profile.linkedin)
     return {
         "name": profile.name or "",
         "contact": contact,
@@ -50,7 +54,9 @@ def build_base_cv_from_profile(profile) -> dict:
             {"degree": edu, "institution": "", "year": ""}
             for edu in (profile.education or [])
         ],
-        "skills": {"Technical": list(profile.skills or []), "Core Stack": list(profile.core_stack or [])},
+        "skills": (dict(profile.skills_categories)
+                   if profile.skills_categories
+                   else {"Technical": list(profile.skills or []), "Core Stack": list(profile.core_stack or [])}),
     }
 
 
@@ -196,22 +202,22 @@ async def build_tailored_cv_data(
         "2. PRESERVE EVERY role in the base CV - never omit or drop any experience entry (e.g. keep the Dematic "
         "Commissioning Engineer role so continuous tenure ~6.8 years is reflected). Do not change employers or date spans.\n"
         "3. DATES: unify strictly to 'Mon YYYY - Mon YYYY' or 'Mon YYYY - Present' (e.g. 'Sep 2025 - Present', 'Jul 2024 - Sep 2025').\n"
-        "4. BULLETS: always use XYZ format (Accomplished X, measured by Y, by doing Z). NEVER use "
-        "placeholders like '[X]%', '[X]+ TPS' or '[Métrica]' - write complete, ready-to-send bullets "
-        "using the concrete facts available. Every bullet must be a bullet item, never free text.\n"
+        "4. BULLETS: keep each bullet concise and use XYZ format (Accomplished X, measured by Y, by doing Z). PRESERVE any "
+        "leading label at the start of a bullet (e.g. 'Infrastructure Standardization:', 'Region Flex:') - keep it as the "
+        "bullet's bold-style prefix, do not drop it. NEVER use placeholders like '[X]%' or '[Métrica]' - write complete, "
+        "ready-to-send bullets using the concrete facts available. Every bullet must be a bullet item, never free text.\n"
         "5. Rewrite bullets that address JD requirements; set 'modified': true with a 'match_reason' referencing the JD "
         "requirement. Keep bullets that still fit as-is with 'modified': false and no match_reason.\n"
-        "6. HEADER: format location as 'Mexico City, MX (Open to US Relocation / TN Visa Eligible)'. Include LinkedIn and "
-        "GitHub placeholders in contact.\n"
+        "6. HEADER: put the visa note 'Mexico City, MX (Open to US Relocation / TN Visa Eligible)' ONCE in contact; keep each "
+        "job's location as just the plain city/country (do NOT repeat the visa note in every job).\n"
         "7. SKILLS: restructure into exactly 3 categories: 'Languages & Frameworks', 'Cloud & Infrastructure', 'Architecture'. "
-        "Use ONLY skills/technologies that already appear in the base CV - NEVER add a technology that is not there (no Docker, "
-        "Kubernetes, Kafka, Terraform, TypeScript, .NET, etc. unless present in the base CV).\n"
+        "Keep each category SHORT and representative (3-6 items max) - do NOT enumerate every sub-service (e.g. write 'AWS' "
+        "instead of 'SQS, SNS, RDS, EC2, S3'). Use ONLY skills/technologies already in the base CV - never add new ones.\n"
         "8. CONTACT: use only the base CV's contact info. NEVER invent LinkedIn/GitHub URLs or other profiles.\n"
         "9. Preserve every numeric metric from the base CV verbatim (e.g., '69+ packages', '15+ services', '10+ core services'); "
         "do not drop or round numbers.\n"
-        "10. SUMMARY: echo the JD's keywords, focusing on senior-level, high-impact achievements. Do NOT mention or "
-        "highlight minor/entry-level certifications (e.g., AWS Cloud Practitioner) in the summary - leave certifications "
-        "only in the Education/Certifications section.\n"
+        "10. SUMMARY: 2-3 concise sentences (max ~45 words), echoing the JD's keywords without padding. Do NOT mention minor "
+        "certifications (e.g., AWS Cloud Practitioner) in the summary.\n"
         "11. Return the complete CV structure (name, contact, summary, experience, education, skills).\n"
         "Output the JSON object conforming to the provided schema."
     )
