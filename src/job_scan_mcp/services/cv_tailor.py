@@ -209,8 +209,10 @@ async def build_tailored_cv_data(
         "8. CONTACT: use only the base CV's contact info. NEVER invent LinkedIn/GitHub URLs or other profiles.\n"
         "9. Preserve every numeric metric from the base CV verbatim (e.g., '69+ packages', '15+ services', '10+ core services'); "
         "do not drop or round numbers.\n"
-        "10. Adjust the summary to echo the JD's keywords, and return the complete CV structure (name, contact, summary, "
-        "experience, education, skills).\n"
+        "10. SUMMARY: echo the JD's keywords, focusing on senior-level, high-impact achievements. Do NOT mention or "
+        "highlight minor/entry-level certifications (e.g., AWS Cloud Practitioner) in the summary - leave certifications "
+        "only in the Education/Certifications section.\n"
+        "11. Return the complete CV structure (name, contact, summary, experience, education, skills).\n"
         "Output the JSON object conforming to the provided schema."
     )
 
@@ -279,7 +281,10 @@ PDF_TEMPLATE = """<!DOCTYPE html>
         h1 { font-size: 18pt; text-align: center; margin: 0 0 4px; font-weight: bold; }
         .contact-info { text-align: center; font-size: 9pt; margin: 0 0 12px; color: #111; }
         .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; margin-top: 12px; margin-bottom: 6px; }
-        .item-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
+        .company-line { font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
+        .item-header { display: flex; justify-content: space-between; font-size: 10pt; margin-bottom: 3px; }
+        .item-header .title { font-style: italic; }
+        .item-header .meta { font-size: 9pt; }
         .item-subheader { display: flex; justify-content: space-between; font-style: italic; font-size: 9pt; margin-bottom: 3px; }
         ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
         li { margin-bottom: 2px; }
@@ -290,15 +295,17 @@ PDF_TEMPLATE = """<!DOCTYPE html>
     </style>
 </head>
 <body>
-    <h1>{{ cv.name or '' }}</h1>
+    <h1>{{ (cv.name or '') | upper }}</h1>
     <div class="contact-info">{{ cv.contact | join(' &nbsp;|&nbsp; ') | safe }}</div>
+
+    <div class="section-title">Summary</div>
     <div class="summary">{{ cv.summary or '' }}</div>
 
     <div class="section-title">Experience</div>
     {% for job in (cv.experience or []) %}
     <div>
-        <div class="item-header"><span>{{ job.title }}</span><span>{{ job.date }}</span></div>
-        <div class="item-subheader"><span>{{ job.company }}</span><span>{{ job.location }}</span></div>
+        <div class="company-line">{{ job.company }}</div>
+        <div class="item-header"><span class="title">{{ job.title }}</span><span class="meta">{{ job.location }}{% if job.location and job.date %} &middot; {% endif %}{{ job.date }}</span></div>
         <ul>{% for bullet in (job.bullets or []) %}<li>{{ bullet.text if bullet is mapping else bullet }}</li>{% endfor %}</ul>
     </div>
     {% endfor %}

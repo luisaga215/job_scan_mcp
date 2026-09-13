@@ -18,7 +18,10 @@
         .paper h1 { font-size: 18pt; text-align: center; margin: 0 0 4px; font-weight: bold; }
         .paper .contact-info { text-align: center; font-size: 9pt; margin: 0 0 12px; color: #111; }
         .paper .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; margin-top: 12px; margin-bottom: 6px; }
-        .paper .item-header { display: flex; justify-content: space-between; font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
+        .paper .company-line { font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
+        .paper .item-header { display: flex; justify-content: space-between; font-size: 10pt; margin-bottom: 3px; }
+        .paper .item-header .title { font-style: italic; }
+        .paper .item-header .meta { font-size: 9pt; }
         .paper .item-subheader { display: flex; justify-content: space-between; font-style: italic; font-size: 9pt; margin-bottom: 3px; }
         .paper ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
         .paper li { margin-bottom: 2px; font-size: 10pt; line-height: 1.3; }
@@ -104,18 +107,17 @@
             <!-- Paper preview -->
             <section class="flex-1 min-w-0">
                 <div class="paper mx-auto w-full max-w-[820px] bg-white shadow-2xl rounded-sm p-10">
-                    <h1 x-text="cv.name || ''"></h1>
+                    <h1 x-text="(cv.name || '').toUpperCase()"></h1>
                     <div class="contact-info" x-text="(cv.contact || []).join('  |  ')"></div>
+                    <div class="section-title">Summary</div>
                     <div class="summary" x-text="cv.summary || ''"></div>
 
                     <div class="section-title">Experience</div>
                     <template x-for="(job, ji) in cv.experience" :key="ji">
                         <div>
+                            <div class="company-line" x-text="job.company"></div>
                             <div class="item-header">
-                                <span x-text="job.title"></span><span x-text="job.date"></span>
-                            </div>
-                            <div class="item-subheader">
-                                <span x-text="job.company"></span><span x-text="job.location"></span>
+                                <span class="title" x-text="job.title"></span><span class="meta" x-text="[job.location, job.date].filter(Boolean).join(' · ')"></span>
                             </div>
                             <ul>
                                 <template x-for="(b, bi) in job.bullets" :key="bi">
@@ -224,8 +226,8 @@
                     const bullets = (job) => (job.bullets || []).map(b => `<li>${esc(b.text || '')}</li>`).join('');
                     const exp = (cv.experience || []).map(job => `
                         <div>
-                            <div class="item-header"><span>${esc(job.title)}</span><span>${esc(job.date)}</span></div>
-                            <div class="item-subheader"><span>${esc(job.company)}</span><span>${esc(job.location)}</span></div>
+                            <div class="company-line">${esc(job.company)}</div>
+                            <div class="item-header"><span class="title">${esc(job.title)}</span><span class="meta">${esc([job.location, job.date].filter(Boolean).join(' · '))}</span></div>
                             <ul>${bullets(job)}</ul>
                         </div>`).join('');
                     const edu = (cv.education || []).map(e => `
@@ -235,17 +237,21 @@
                         `<div class="skill-row"><span class="bold">${esc(g)}:</span> ${esc((items || []).join(', '))}</div>`).join('');
                     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><style>
 @page{margin:0.5in}
-body{font-family:'Helvetica Neue',Helvetica,Arial,sans-serif;color:#111;line-height:1.3;font-size:10.5pt}
-h1{font-size:20pt;text-align:center;margin-bottom:4px;font-weight:normal}
-.contact-info{text-align:center;font-size:9.5pt;margin-bottom:15px;color:#333}
-.section-title{font-size:12pt;text-transform:uppercase;border-bottom:1px solid #000;margin-top:12px;margin-bottom:8px;font-weight:bold}
-.item-header{display:flex;justify-content:space-between;font-weight:bold;margin-bottom:2px}
-.item-subheader{display:flex;justify-content:space-between;font-style:italic;margin-bottom:4px;font-size:10pt}
-ul{margin-top:0;padding-left:20px;margin-bottom:12px}li{margin-bottom:3px}
-.summary{margin-bottom:12px;font-size:10pt}.skill-row{margin-bottom:4px;font-size:10pt}.bold{font-weight:bold}
+body{font-family:'Times New Roman',Times,serif;color:#111;line-height:1.3;font-size:10pt}
+h1{font-size:18pt;text-align:center;margin:0 0 4px;font-weight:bold}
+.contact-info{text-align:center;font-size:9pt;margin:0 0 12px;color:#111}
+.section-title{font-size:11pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #000;margin-top:12px;margin-bottom:6px}
+.company-line{font-weight:bold;font-size:10pt;margin-bottom:1px}
+.item-header{display:flex;justify-content:space-between;font-size:10pt;margin-bottom:3px}
+.item-header .title{font-style:italic}
+.item-header .meta{font-size:9pt}
+.item-subheader{display:flex;justify-content:space-between;font-style:italic;font-size:9pt;margin-bottom:3px}
+ul{margin-top:0;padding-left:18px;margin-bottom:8px}li{margin-bottom:2px}
+.summary{margin:0 0 8px;font-size:10pt}.skill-row{margin-bottom:2px;font-size:10pt}.bold{font-weight:bold}
 </style></head><body>
-<h1>${esc(cv.name)}</h1>
+<h1>${esc((cv.name || '').toUpperCase())}</h1>
 <div class="contact-info">${esc((cv.contact || []).join(' | '))}</div>
+<div class="section-title">Summary</div>
 <div class="summary">${esc(cv.summary)}</div>
 <div class="section-title">Experience</div>${exp}
 ${edu ? '<div class="section-title">Education</div>' + edu : ''}
