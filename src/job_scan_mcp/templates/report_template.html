@@ -64,18 +64,18 @@
 
         /* Inline CV paper preview (ATS look — Times New Roman, jobright-style) */
         .paper { background: #fff; color: #111; font-family: 'Times New Roman', Times, serif; }
-        .paper h1 { font-size: 18pt; text-align: center; margin: 0 0 4px; font-weight: bold; }
-        .paper .contact-info { text-align: center; font-size: 9pt; margin: 0 0 12px; color: #111; }
-        .paper .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; margin-top: 12px; margin-bottom: 6px; }
+        .paper h1 { font-size: 18pt; text-align: center; margin: 0 0 2px; font-weight: bold; }
+        .paper .contact-info { text-align: center; font-size: 8.5pt; margin: 0 0 6px; color: #111; }
+        .paper .section-title { font-size: 11pt; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 1px solid #000; margin-top: 6px; margin-bottom: 3px; }
         .paper .company-line { font-weight: bold; font-size: 10pt; margin-bottom: 1px; }
-        .paper .item-header { display: flex; justify-content: space-between; font-size: 10pt; margin-bottom: 3px; }
+        .paper .item-header { display: flex; justify-content: space-between; font-size: 9.5pt; margin-bottom: 1px; }
         .paper .item-header .title { font-style: italic; }
-        .paper .item-header .meta { font-size: 9pt; }
-        .paper .item-subheader { display: flex; justify-content: space-between; font-style: italic; font-size: 9pt; margin-bottom: 3px; }
-        .paper ul { margin-top: 0; padding-left: 18px; margin-bottom: 8px; }
-        .paper li { margin-bottom: 2px; font-size: 10pt; line-height: 1.3; }
-        .paper .summary { margin: 0 0 8px; font-size: 10pt; }
-        .paper .skill-row { margin-bottom: 2px; font-size: 10pt; }
+        .paper .item-header .meta { font-size: 8.5pt; }
+        .paper .item-subheader { display: flex; justify-content: space-between; font-style: italic; font-size: 8.5pt; margin-bottom: 1px; }
+        .paper ul { margin-top: 0; padding-left: 16px; margin-bottom: 4px; }
+        .paper li { margin-bottom: 1px; font-size: 9.5pt; line-height: 1.2; }
+        .paper .summary { margin: 0 0 5px; font-size: 9.5pt; }
+        .paper .skill-row { margin-bottom: 1px; font-size: 9.5pt; }
         .paper .bold { font-weight: bold; }
         .bullet { position: relative; border-radius: 3px; transition: background .15s; }
         .bullet.highlighted { background: #fef3c7; box-shadow: inset 2px 0 0 #f59e0b; }
@@ -1418,18 +1418,18 @@
                     const skills = Object.entries(cv.skills || {}).map(([g, items]) =>
                         `<div class="skill-row"><span class="bold">${esc(g)}:</span> ${esc((items || []).join(', '))}</div>`).join('');
                     return `<!DOCTYPE html><html><head><meta charset="UTF-8"><title>${esc(cv.name)}</title><style>
-@page{margin:0.5in}
-body{font-family:'Times New Roman',Times,serif;color:#111;line-height:1.3;font-size:10pt}
-h1{font-size:18pt;text-align:center;margin:0 0 4px;font-weight:bold}
-.contact-info{text-align:center;font-size:9pt;margin:0 0 12px;color:#111}
-.section-title{font-size:11pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #000;margin-top:12px;margin-bottom:6px}
+@page{margin:0.35in}
+body{font-family:'Times New Roman',Times,serif;color:#111;line-height:1.2;font-size:9.5pt}
+h1{font-size:18pt;text-align:center;margin:0 0 2px;font-weight:bold}
+.contact-info{text-align:center;font-size:8.5pt;margin:0 0 6px;color:#111}
+.section-title{font-size:11pt;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid #000;margin-top:6px;margin-bottom:3px}
 .company-line{font-weight:bold;font-size:10pt;margin-bottom:1px}
-.item-header{display:flex;justify-content:space-between;font-size:10pt;margin-bottom:3px}
+.item-header{display:flex;justify-content:space-between;font-size:9.5pt;margin-bottom:1px}
 .item-header .title{font-style:italic}
-.item-header .meta{font-size:9pt}
-.item-subheader{display:flex;justify-content:space-between;font-style:italic;font-size:9pt;margin-bottom:3px}
-ul{margin-top:0;padding-left:18px;margin-bottom:8px}li{margin-bottom:2px}
-.summary{margin:0 0 8px;font-size:10pt}.skill-row{margin-bottom:2px;font-size:10pt}.bold{font-weight:bold}
+.item-header .meta{font-size:8.5pt}
+.item-subheader{display:flex;justify-content:space-between;font-style:italic;font-size:8.5pt;margin-bottom:1px}
+ul{margin-top:0;padding-left:16px;margin-bottom:4px}li{margin-bottom:1px}
+.summary{margin:0 0 5px;font-size:9.5pt}.skill-row{margin-bottom:1px;font-size:9.5pt}.bold{font-weight:bold}
 </style></head><body>
 <h1>${esc((cv.name || '').toUpperCase())}</h1>
 <div class="contact-info">${esc((cv.contact || []).join(' | '))}</div>
