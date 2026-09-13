@@ -64,7 +64,7 @@ The default models can be overridden at runtime with the `configure_llm` tool.
 | --- | --- |
 | `sync_cv(file_path)` | Parse a CV (PDF/MD/TXT) into a structured candidate profile |
 | `get_user_profile()` | Return the synced candidate profile |
-| `fetch_and_filter_jobs(queries, locations, ...)` | Scrape jobs and apply remote/salary/visa filters |
+| `fetch_and_filter_jobs(queries, locations, hours_old, ...)` | Scrape jobs and apply remote/salary/visa filters. `hours_old` controls recency (default 72h; use 720 for the last 30 days) |
 | `run_fast_screening(batch_size, ...)` | Quick relevance screening (visa-friendly first, partial batching) |
 | `run_deep_evaluation(batch_size, ...)` | LangGraph deep evaluation (fit, seniority, red flags) |
 | `get_pipeline_status()` | Pipeline counts + active LLM configuration |

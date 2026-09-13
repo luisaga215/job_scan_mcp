@@ -173,6 +173,22 @@ async def test_fetch_and_save_jobs(mock_scrape, test_repo):
 
 @pytest.mark.asyncio
 @patch("job_scan_mcp.services.job_service.scrape_jobs")
+async def test_fetch_passes_hours_old(mock_scrape, test_repo):
+    """hours_old is forwarded to jobspy (e.g. 720 = last 30 days)."""
+    mock_scrape.return_value = pd.DataFrame([])
+    await fetch_and_save_jobs(
+        repo=test_repo,
+        queries=["Backend Engineer"],
+        locations=["New York, NY"],
+        max_pool_size=10,
+        hours_old=720,
+    )
+    assert mock_scrape.called
+    assert mock_scrape.call_args.kwargs.get("hours_old") == 720
+
+
+@pytest.mark.asyncio
+@patch("job_scan_mcp.services.job_service.scrape_jobs")
 async def test_fetch_and_save_jobs_saves_visa_flags(mock_scrape, test_repo):
     """Verify visa/relocation signals are computed and persisted on saved jobs."""
     mock_data = pd.DataFrame([

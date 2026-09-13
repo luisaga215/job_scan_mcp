@@ -105,7 +105,8 @@ async def fetch_and_filter_jobs(
     max_pool_size: int = 150,
     is_remote: Optional[bool] = None,
     min_salary: Optional[float] = None,
-    require_visa_friendly: Optional[bool] = None
+    require_visa_friendly: Optional[bool] = None,
+    hours_old: int = 72
 ) -> Dict[str, Any]:
     """Scrape jobs via jobspy, apply deterministic Python filters, and save new postings as PENDING_SCREENING.
 
@@ -116,6 +117,7 @@ async def fetch_and_filter_jobs(
         is_remote: Optional filter. True: Remote-only, False: Onsite/Hybrid, None: All.
         min_salary: Optional minimum annual salary threshold (tolerates None fields).
         require_visa_friendly: Optional strict filter. True: keep ONLY postings that explicitly offer visa sponsorship or relocation.
+        hours_old: Only include postings newer than this many hours (default: 72). Use e.g. 720 for the last 30 days.
     """
     await ensure_db()
     async with db_manager.session() as session:
@@ -127,7 +129,8 @@ async def fetch_and_filter_jobs(
             max_pool_size=max_pool_size,
             is_remote=is_remote,
             min_salary=min_salary,
-            require_visa_friendly=require_visa_friendly
+            require_visa_friendly=require_visa_friendly,
+            hours_old=hours_old
         )
         return {
             "status": "success",

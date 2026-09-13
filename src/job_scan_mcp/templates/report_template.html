@@ -98,23 +98,24 @@
 </head>
 <body class="h-full flex flex-col font-sans antialiased overflow-x-hidden selection:bg-indigo-500 selection:text-white">
 
-    <div class="max-w-[1600px] mx-auto w-full px-4 sm:px-6 lg:px-8 py-8 flex-1 flex flex-col gap-8" x-data="jobScreeningApp()">
+    <div class="w-full px-4 sm:px-6 lg:px-8 py-4 flex-1 flex flex-col gap-4" x-data="jobScreeningApp()">
 
-        <!-- Header -->
-        <header class="flex flex-col md:flex-row md:items-center md:justify-between gap-4 border-b border-slate-800/80 pb-6">
-            <div>
-                <h1 class="text-2xl font-bold tracking-tight text-white">
-                    Job Evaluator Dashboard
-                </h1>
-                <p class="text-slate-400 text-sm mt-0.5">Evaluated vacancies, ranked by fit.</p>
+        <!-- Navbar -->
+        <header class="sticky top-0 z-30 bg-slate-950/95 backdrop-blur border-b border-slate-800 -mx-4 sm:-mx-6 lg:-mx-8 px-4 sm:px-6 lg:px-8 py-2.5 flex items-center gap-4">
+            <div class="flex items-center gap-2 min-w-0">
+                <h1 class="text-base font-bold tracking-tight text-white whitespace-nowrap">Job Evaluator</h1>
+                <span class="text-slate-600 hidden md:inline text-xs truncate">Evaluated vacancies, ranked by fit</span>
             </div>
-            <div class="flex items-center gap-3 text-right text-slate-400 text-xs md:text-sm self-start md:self-auto">
-                <span class="bg-slate-900 border border-slate-800 rounded-lg px-3 py-1.5 inline-block">
-                    Last Compiled: <span class="text-indigo-400 font-semibold">{{ generated_at }}</span>
+            <div class="ml-auto flex items-center gap-3 text-xs text-slate-400 shrink-0">
+                <span class="hidden lg:flex items-center gap-3">
+                    <span class="inline-flex items-center gap-1.5"><span class="text-slate-500">Evaluated</span><span class="font-semibold text-white">{{ metrics.evaluated }}</span></span>
+                    <span class="inline-flex items-center gap-1.5"><span class="text-slate-500">Avg Fit</span><span class="font-semibold text-white">{{ metrics.average_fit }}%</span></span>
+                    <span class="inline-flex items-center gap-1.5"><span class="text-slate-500">Top Fit</span><span class="font-semibold text-white">{{ metrics.top_fit }}%</span></span>
+                    <span class="text-slate-700">|</span>
                 </span>
                 <!-- Reports history -->
                 <button @click="showReports = !showReports" title="Report history"
-                        class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-lg px-3 py-1.5 inline-flex items-center gap-1.5 transition">
+                        class="bg-slate-900 hover:bg-slate-800 border border-slate-800 text-slate-300 rounded-lg px-2.5 py-1.5 inline-flex items-center gap-1.5 transition">
                     <i data-lucide="history" class="w-4 h-4"></i>
                     <span class="font-semibold">Reports</span>
                     <span class="bg-indigo-600/30 text-indigo-300 text-[10px] font-bold rounded px-1.5 py-0.5" x-text="reportsManifest.length"></span>
@@ -139,22 +140,6 @@
                 </div>
             </div>
         </header>
-
-        <!-- Metrics -->
-        <section class="grid grid-cols-3 gap-4">
-            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Evaluated jobs</span>
-                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.evaluated }}</span>
-            </div>
-            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Avg Fit</span>
-                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.average_fit }}%</span>
-            </div>
-            <div class="bg-slate-900/60 border border-slate-800/80 rounded-xl p-4 flex flex-col justify-between">
-                <span class="text-[11px] font-medium uppercase tracking-wider text-slate-500">Top Fit</span>
-                <span class="text-2xl font-semibold mt-1 text-white">{{ metrics.top_fit }}%</span>
-            </div>
-        </section>
 
         <!-- App -->
         <main class="flex flex-col gap-5 flex-1">
@@ -221,7 +206,7 @@
 
                 <!-- ============ FILTERS LEFT RAIL ============ -->
                 <!-- ============ FILTERS PANEL (left, in-flow) ============ -->
-                <aside x-show="filtersOpen" x-cloak class="w-72 shrink-0 bg-slate-900/40 border border-slate-800 rounded-xl sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain flex flex-col">
+                <aside x-show="filtersOpen" x-cloak class="w-64 shrink-0 bg-slate-900/40 border border-slate-800 rounded-xl sticky top-4 max-h-[calc(100vh-2rem)] overflow-y-auto overscroll-contain flex flex-col">
                     <div class="flex items-center justify-between gap-3 p-4 border-b border-slate-800 shrink-0">
                         <h2 class="text-sm font-bold text-white flex items-center gap-2">
                             <i data-lucide="sliders-horizontal" class="w-4 h-4 text-indigo-300"></i> Filters
@@ -230,17 +215,17 @@
                             <i data-lucide="x" class="w-5 h-5"></i>
                         </button>
                     </div>
-                    <div class="p-4 flex flex-col gap-4">
+                    <div class="p-4 flex flex-col gap-3">
 
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Search</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Search</label>
                         <input x-model="search" @input="saveFilters()" type="text" placeholder="Title, company, location..."
                                class="w-full bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm text-slate-100 placeholder-slate-500 focus:outline-none focus:border-indigo-500 transition">
                     </div>
 
                     <!-- Work mode multi-select -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Work mode (multi-select)</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Work mode (multi-select)</label>
                         <div class="flex flex-col gap-1.5">
                             <label class="flex items-center gap-2 text-sm cursor-pointer hover:text-white transition">
                                 <input type="checkbox" value="remote" x-model="modes" @change="saveFilters()" class="accent-indigo-500">
@@ -260,7 +245,7 @@
 
                     <!-- Date posted -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Posted</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Posted</label>
                         <div class="flex flex-wrap gap-1.5">
                             <template x-for="opt in dateOptions" :key="opt.v">
                                 <button @click="dateChip = opt.v; saveFilters()" :class="dateChip === opt.v ? 'bg-indigo-600/30 border-indigo-500 text-indigo-200' : 'bg-slate-950 border-slate-800 text-slate-400 hover:text-slate-200'" class="px-2.5 py-1 text-[11px] font-semibold border rounded-lg transition" x-text="opt.l"></button>
@@ -275,7 +260,7 @@
 
                     <!-- Salary -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Salary (USD k)</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Salary (USD k)</label>
                         <div class="flex items-center gap-2">
                             <input x-model="salMin" @change="saveFilters()" type="number" min="0" placeholder="Min" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
                             <span class="text-slate-600">–</span>
@@ -289,7 +274,7 @@
 
                     <!-- Visa / relocation -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Visa / Relocation</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Visa / Relocation</label>
                         <div class="flex flex-col gap-1.5 text-sm">
                             <label class="flex items-center gap-2 cursor-pointer">
                                 <input type="checkbox" x-model="requireSponsorship" @change="saveFilters()" class="accent-emerald-500">
@@ -308,7 +293,7 @@
 
                     <!-- Application friction -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Application friction</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Application friction</label>
                         <div class="flex flex-col gap-1.5 text-sm">
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="Low" x-model="frictions" @change="saveFilters()" class="accent-indigo-500"><span class="text-emerald-400">Low</span></label>
                             <label class="flex items-center gap-2 cursor-pointer"><input type="checkbox" value="Medium" x-model="frictions" @change="saveFilters()" class="accent-indigo-500"><span class="text-amber-400">Medium</span></label>
@@ -318,7 +303,7 @@
 
                     <!-- Red flags -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Red flags</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Red flags</label>
                         <select x-model="redFlags" @change="saveFilters()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
                             <option value="any">Any</option>
                             <option value="none">No red flags</option>
@@ -329,7 +314,7 @@
 
                     <!-- Fit range -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Fit score</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Fit score</label>
                         <div class="flex items-center gap-2 text-xs">
                             <input x-model.number="fitMin" @change="saveFilters()" type="number" min="0" max="100" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-100 focus:outline-none focus:border-indigo-500">
                             <span class="text-slate-600">–</span>
@@ -339,7 +324,7 @@
 
                     <!-- Application status (kanban) -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">My application</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">My application</label>
                         <select x-model="appFilter" @change="saveFilters()" class="w-full bg-slate-950 border border-slate-800 rounded-lg px-2 py-1.5 text-sm text-slate-200 focus:outline-none focus:border-indigo-500">
                             <option value="all">All</option>
                             <option value="apply">To apply</option>
@@ -351,7 +336,7 @@
 
                     <!-- Locations -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Location (multi-select)</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Location (multi-select)</label>
                         <div class="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
                             <template x-for="loc in locationsOptions" :key="loc">
                                 <label class="flex items-center gap-2 text-xs cursor-pointer">
@@ -364,7 +349,7 @@
 
                     <!-- Companies -->
                     <div>
-                        <label class="text-[11px] font-bold uppercase tracking-wider text-slate-500 block mb-1.5">Company (multi-select)</label>
+                        <label class="text-[10px] font-semibold uppercase tracking-wider text-slate-500 block mb-1">Company (multi-select)</label>
                         <div class="flex flex-col gap-1.5 max-h-40 overflow-y-auto">
                             <template x-for="co in companiesOptions" :key="co">
                                 <label class="flex items-center gap-2 text-xs cursor-pointer">

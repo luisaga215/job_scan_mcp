@@ -59,9 +59,12 @@ async def screen_single_job(
             f"Description Summary (First 3000 chars):\n{job.description[:3000]}\n\n"
             "Determine if this job is relevant. If the candidate does not have the required experience, "
             "if there is no stack alignment, or if the role doesn't fit the candidate's professional trajectory, mark relevant as false.\n"
-            "IMPORTANT: If the job explicitly states the employer will NOT sponsor visas or requires the candidate to "
-            "already be authorized to work in the US (e.g., 'must be authorized to work', 'US citizens only', 'no visa "
-            "sponsorship'), mark relevant as false because the candidate requires work authorization sponsorship."
+            "IMPORTANT visa rule: mark relevant as false ONLY when the posting EXPLICITLY excludes sponsorship or requires "
+            "candidates to already hold work authorization in a way that blocks sponsorship (e.g., 'must be authorized to "
+            "work in the US', 'US citizens or green card holders only', 'no visa sponsorship', 'we do not sponsor'). "
+            "Do NOT reject a job merely because it does not mention sponsorship, because it is in a different country, or "
+            "because relocation is not mentioned - absence of sponsorship information is neutral. If the job description "
+            "is empty or too short to assess, mark relevant as true (it will be verified later) rather than rejecting."
         )
         
         try:

@@ -193,12 +193,14 @@ async def fetch_and_save_jobs(
     max_pool_size: int = 150,
     is_remote: Optional[bool] = None,
     min_salary: Optional[float] = None,
-    require_visa_friendly: Optional[bool] = None
+    require_visa_friendly: Optional[bool] = None,
+    hours_old: int = 72
 ) -> Dict[str, Any]:
     """Scrape job postings, apply Python-level filters, and persist non-duplicates as PENDING_SCREENING.
 
     If require_visa_friendly is True, only postings with explicit sponsorship or relocation
-    signals are kept (strict US visa-oriented search).
+    signals are kept (strict US visa-oriented search). hours_old controls how recent postings
+    must be (in hours; e.g. 720 = last 30 days).
     """
     all_scraped_jobs: List[Dict[str, Any]] = []
     
@@ -219,7 +221,7 @@ async def fetch_and_save_jobs(
                 search_term=query,
                 location=loc,
                 results_wanted=results_per_combination,
-                hours_old=72,
+                hours_old=hours_old,
                 country_indeed='usa'
             )
             
@@ -281,6 +283,7 @@ async def fetch_and_save_jobs(
         "is_remote": is_remote,
         "min_salary": min_salary,
         "require_visa_friendly": require_visa_friendly,
+        "hours_old": hours_old,
         "ran_at": datetime.now().isoformat(timespec="seconds"),
     })
     
