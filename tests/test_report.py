@@ -308,6 +308,30 @@ def test_replace_manifest_in_html_handles_nested_arrays():
 
 
 @pytest.mark.asyncio
+async def test_report_scopes_to_run(test_repo, tmp_path, monkeypatch):
+    """Each report is scoped to a single search run (independent per search)."""
+    monkeypatch.setattr("job_scan_mcp.services.report.REPORTS_DIR", tmp_path)
+    await test_repo.set_pipeline_meta("search_runs", [
+        {"run_id": "r1", "queries": ["q1"], "locations": ["X"], "ran_at": "2026-01-01T00:00:00"},
+        {"run_id": "r2", "queries": ["q2"], "locations": ["Y"], "ran_at": "2026-02-01T00:00:00"},
+    ])
+    await test_repo.save_job(Job(id="r1_job", title="A", company="AlphaRunCo", location="X",
+                                 description="d", job_url="u", state="EVALUATED", fit_score=50, run_id="r1"))
+    await test_repo.save_job(Job(id="r2_job", title="B", company="BetaRunCo", location="Y",
+                                 description="d", job_url="u", state="EVALUATED", fit_score=80, run_id="r2"))
+
+    # Default -> latest run (r2)
+    html_latest = Path((await generate_report(test_repo)).replace("file:///", "")).read_text(encoding="utf-8")
+    assert "BetaRunCo" in html_latest
+    assert "AlphaRunCo" not in html_latest
+
+    # Explicit run r1
+    html_r1 = Path((await generate_report(test_repo, run_id="r1")).replace("file:///", "")).read_text(encoding="utf-8")
+    assert "AlphaRunCo" in html_r1
+    assert "BetaRunCo" not in html_r1
+
+
+@pytest.mark.asyncio
 async def test_report_embeds_tailored_cv(test_repo, tmp_path, monkeypatch):
     """A tailored CV persisted on the job flows into the report payload for offline preview."""
     monkeypatch.setattr("job_scan_mcp.services.report.REPORTS_DIR", tmp_path)

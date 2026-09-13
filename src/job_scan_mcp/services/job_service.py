@@ -1,6 +1,7 @@
 import hashlib
 import logging
 import re
+import uuid
 from typing import List, Optional, Dict, Any
 from datetime import datetime
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -208,6 +209,9 @@ async def fetch_and_save_jobs(
     combinations = [(q, l) for q in queries for l in locations]
     if not combinations:
         return {"error": "No queries or locations provided."}
+
+    # Each fetch is a distinct "search run" so reports can be scoped per search
+    run_id = f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:4]}"
         
     results_per_combination = max(5, int(max_pool_size / len(combinations)))
     
@@ -276,7 +280,8 @@ async def fetch_and_save_jobs(
     visa_friendly_saved = 0
 
     # Persist the search context so reports can show what was searched
-    await repo.set_pipeline_meta("last_search", {
+    run_meta = {
+        "run_id": run_id,
         "queries": queries,
         "locations": locations,
         "max_pool_size": max_pool_size,
@@ -285,7 +290,11 @@ async def fetch_and_save_jobs(
         "require_visa_friendly": require_visa_friendly,
         "hours_old": hours_old,
         "ran_at": datetime.now().isoformat(timespec="seconds"),
-    })
+    }
+    await repo.set_pipeline_meta("last_search", run_meta)
+    runs = await repo.get_pipeline_meta("search_runs") or []
+    runs.append(run_meta)
+    await repo.set_pipeline_meta("search_runs", runs)
     
     # Save to database
     for job_dict in filtered_jobs:
@@ -310,19 +319,21 @@ async def fetch_and_save_jobs(
                 relocation_support=visa.get("relocation_support"),
                 us_eligible=visa.get("us_eligible"),
                 visa_keywords=visa.get("visa_keywords"),
+                run_id=run_id,
             )
             await repo.save_job(new_job)
             new_jobs_saved += 1
             if visa.get("sponsorship") or visa.get("relocation_support"):
                 visa_friendly_saved += 1
         else:
-            # Refresh visa signals on re-fetches (backfill for rows created pre-analysis)
+            # Refresh visa signals + run tag on re-fetches
             changed = False
             for field, value in (
                 ("sponsorship", visa.get("sponsorship")),
                 ("relocation_support", visa.get("relocation_support")),
                 ("us_eligible", visa.get("us_eligible")),
                 ("visa_keywords", visa.get("visa_keywords")),
+                ("run_id", run_id),
             ):
                 if getattr(existing, field) != value:
                     setattr(existing, field, value)

@@ -41,6 +41,7 @@ class DatabaseManager:
             "application_status": "VARCHAR",
             "application_status_updated_at": "DATETIME",
             "tailored_cv_json": "TEXT",
+            "run_id": "VARCHAR",
         }
         for column, ctype in wanted.items():
             if column not in existing:

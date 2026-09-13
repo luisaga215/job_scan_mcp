@@ -186,10 +186,16 @@ async def get_pipeline_status() -> Dict[str, Any]:
         fast_cfg = await repo.get_llm_config("fast_screening")
         deep_cfg = await repo.get_llm_config("deep_evaluation")
         profile = await repo.get_user_profile()
+        runs = await repo.get_pipeline_meta("search_runs") or []
         
         return {
             "status": "success",
             "pipeline_counts": counts,
+            "search_runs": [
+                {"run_id": r.get("run_id"), "queries": r.get("queries"), "locations": r.get("locations"),
+                 "ran_at": r.get("ran_at"), "hours_old": r.get("hours_old")}
+                for r in runs
+            ],
             "llm_configurations": {
                 "fast_screening": {
                     "provider": fast_cfg.provider if fast_cfg else config.DEFAULT_SCREENING_MODEL.split("/")[0],
@@ -328,12 +334,19 @@ async def export_cv_to_pdf(tailored_cv_data: dict, file_name: str) -> Dict[str, 
 
 @mcp.tool()
 @handle_mcp_errors
-async def generate_html_report() -> Dict[str, Any]:
-    """Compile database jobs into an interactive HTML dashboard report, saving it locally."""
+async def generate_html_report(run_id: Optional[str] = None) -> Dict[str, Any]:
+    """Compile database jobs into an interactive HTML dashboard report, saving it locally.
+
+    Reports are scoped to a single search run so each report is independent. Omit run_id to use
+    the most recent search run (falls back to all jobs if no runs are recorded).
+
+    Args:
+        run_id: Optional search run identifier (see get_pipeline_status for available runs).
+    """
     await ensure_db()
     async with db_manager.session() as session:
         repo = JobRepository(session)
-        report_uri = await generate_report(repo)
+        report_uri = await generate_report(repo, run_id=run_id)
         return {
             "status": "success",
             "report_path": report_uri

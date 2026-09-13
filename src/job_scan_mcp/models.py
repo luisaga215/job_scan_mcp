@@ -105,6 +105,9 @@ class Job(SQLModel, table=True):
 
     # Tailored CV produced automatically during deep evaluation (or on demand)
     tailored_cv_json: Optional[str] = Field(default=None, description="JSON string of the CV tailored to this job")
+
+    # Search run this job was fetched in (for independent per-search reports)
+    run_id: Optional[str] = Field(default=None, index=True, description="Identifier of the search run that fetched this job")
     
     # State Flow: PENDING_SCREENING -> RELEVANT / REJECTED -> EVALUATED
     state: str = Field(default="PENDING_SCREENING", index=True)

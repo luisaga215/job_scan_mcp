@@ -177,6 +177,20 @@
                 <span class="text-[11px] text-slate-600 ml-auto" x-text="selectedJob ? 'Viewing: ' + selectedJob.company + ' — ' + selectedJob.title : ''"></span>
             </div>
 
+            <!-- Search scope banner -->
+            <div class="flex flex-wrap items-center gap-1.5 text-[11px] text-slate-500" x-show="runInfo && (runInfo.queries || []).length">
+                <span class="uppercase font-semibold tracking-wide text-slate-500">Search:</span>
+                <template x-for="q in (runInfo.queries || [])" :key="q">
+                    <span class="text-indigo-300 bg-indigo-500/10 border border-indigo-500/20 rounded px-1.5 py-0.5" x-text="q"></span>
+                </template>
+                <template x-for="l in (runInfo.locations || [])" :key="l">
+                    <span class="text-slate-300 bg-slate-800/60 border border-slate-700 rounded px-1.5 py-0.5" x-text="l"></span>
+                </template>
+                <template x-if="runInfo.hours_old">
+                    <span class="text-slate-400 border border-slate-700 rounded px-1.5 py-0.5">last <span x-text="Math.round(runInfo.hours_old/24)"></span> days</span>
+                </template>
+            </div>
+
             <!-- Results toolbar -->
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex items-center gap-3 text-sm">
@@ -873,6 +887,7 @@
     <!-- Script -->
     <script>
         window.jobsData = {{ jobs | tojson }};
+        window.runInfo = {{ run_info | tojson }};
         window.profileSummary = {{ profile_summary | tojson }};
         window.profileCoreStack = {{ profile_core_stack | tojson }};
         window.reportsManifest = {{ reports_manifest | tojson }};
@@ -921,6 +936,7 @@
                 cvWidth: 544,
                 reportsManifest: window.reportsManifest || [],
                 currentReport: window.currentReport || {},
+                runInfo: window.runInfo || {},
                 themeMode: 'system',
                 dateOptions: [
                     { v: 'any', l: 'Any' },

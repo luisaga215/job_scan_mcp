@@ -302,23 +302,36 @@ async def _generate_ai_summary(repo: JobRepository, evaluated_jobs: list, avg_fi
         logger.warning("AI summary generation failed: %s", e)
         return None
 
-async def generate_report(repo: JobRepository) -> str:
+async def generate_report(repo: JobRepository, run_id: Optional[str] = None) -> str:
     """Query jobs, compile metrics, render the Jinja2 HTML dashboard, and save a report snapshot.
+
+    Reports are scoped to a single search run so each report is independent. When ``run_id`` is
+    None the most recent run is used (falls back to all jobs if no runs are recorded).
 
     Writes BOTH the latest `index.html` and a timestamped `report-<ts>.html` snapshot, and
     updates `manifest.json` so the UI can list and navigate past reports.
     """
-    # 1. Fetch all jobs + candidate profile (for skill-gap analysis)
-    jobs = await repo.get_all_jobs()
+    # 0. Resolve the search run scope
+    runs = await repo.get_pipeline_meta("search_runs") or []
+    if run_id is None and runs:
+        run_id = max(runs, key=lambda r: r.get("ran_at", ""))["run_id"]
+    run_info = next((r for r in runs if r.get("run_id") == run_id), {}) if run_id else {}
+
+    # 1. Fetch jobs (scoped to the run) + candidate profile (for skill-gap analysis)
+    all_jobs = await repo.get_all_jobs()
+    jobs = [j for j in all_jobs if j.run_id == run_id] if run_id else all_jobs
     profile_record = await repo.get_user_profile()
     profile = profile_record.profile if profile_record else None
     profile_skills = profile.skills if profile else []
     profile_core_stack = profile.core_stack if profile else []
     profile_name = profile.name if profile else "no profile"
     
-    # 2. Compute statistics
+    # 2. Compute statistics (from the scoped jobs)
     total_jobs = len(jobs)
-    counts = await repo.get_pipeline_counts()
+    counts = {"PENDING_SCREENING": 0, "RELEVANT": 0, "REJECTED": 0, "EVALUATED": 0}
+    for j in jobs:
+        if j.state in counts:
+            counts[j.state] += 1
     
     evaluated_jobs = [j for j in jobs if j.state == "EVALUATED"]
     total_evaluated = len(evaluated_jobs)
@@ -397,13 +410,14 @@ async def generate_report(repo: JobRepository) -> str:
     manifest = _load_manifest()
     _clean_manifest_summaries()  # strip markdown from older summaries retroactively
     manifest = _load_manifest()
-    last_search = await repo.get_pipeline_meta("last_search") or {}
+    last_search = run_info or (await repo.get_pipeline_meta("last_search") or {})
     search_context = {
         "queries": last_search.get("queries") or [],
         "locations": last_search.get("locations") or [],
         "is_remote": last_search.get("is_remote"),
         "min_salary": last_search.get("min_salary"),
         "require_visa_friendly": last_search.get("require_visa_friendly"),
+        "hours_old": last_search.get("hours_old"),
         "ran_at": last_search.get("ran_at"),
     }
     ai_summary = await _generate_ai_summary(repo, evaluated_jobs, avg_fit, top_fit)
@@ -411,6 +425,7 @@ async def generate_report(repo: JobRepository) -> str:
     entry = {
         "file": None,  # filled below (timestamped snapshot)
         "generated_at": generated_at_str,
+        "run_id": run_id,
         "total_jobs": total_jobs,
         "pending_screening": counts.get("PENDING_SCREENING", 0),
         "relevant": counts.get("RELEVANT", 0),
@@ -432,6 +447,7 @@ async def generate_report(repo: JobRepository) -> str:
         profile_core_stack=(profile.core_stack if profile else []) or [],
         reports_manifest=manifest["entries"],
         current_report=entry,
+        run_info=search_context,
     )
 
     # 6. Write latest index.html + timestamped snapshot + manifest

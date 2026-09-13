@@ -69,7 +69,7 @@ The default models can be overridden at runtime with the `configure_llm` tool.
 | `run_deep_evaluation(batch_size, ...)` | LangGraph deep evaluation (fit, seniority, red flags) |
 | `get_pipeline_status()` | Pipeline counts + active LLM configuration |
 | `set_job_application_status(job_id, status)` | Persist kanban state: `apply` / `applied` / `interview` / `rejected` |
-| `generate_html_report()` | Render the interactive dashboard + snapshot history |
+| `generate_html_report(run_id)` | Render the dashboard scoped to a search run (each report is independent; omit `run_id` for the latest run) |
 | `archive_report(file)` / `restore_report(file)` | Soft-delete a report snapshot (moves to `reports/archive/`) |
 | `generate_tailored_cv(job_id)` | Tailor the candidate CV for a job on demand (persists `tailored_cv_json`) |
 | `export_cv_to_pdf(tailored_cv_data, file_name)` | Render the tailored CV to an ATS-friendly PDF (Playwright) |
