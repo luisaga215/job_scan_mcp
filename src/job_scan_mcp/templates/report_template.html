@@ -31,6 +31,9 @@
     <script defer src="https://cdn.jsdelivr.net/npm/@alpinejs/collapse@3.x.x/dist/cdn.min.js"></script>
     <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
 
+    <!-- jsPDF (client-side clean PDF export, no browser header/footer) -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+
     <style>
         [x-cloak] { display: none !important; }
         ::-webkit-scrollbar { width: 8px; height: 8px; }
@@ -1172,11 +1175,91 @@
                     this.$nextTick(() => lucide.createIcons());
                 },
                 cvPrintPdf() {
-                    const job = this.cvPanelJob;
-                    if (!job) return;
-                    const text = `export_cv_to_pdf for: ${job.company} — ${job.title} (job_id: ${job.id})`;
-                    this.copyText(text);
-                    this.$dispatch('toast', "Copied. Ask the assistant to run export_cv_to_pdf — it generates a clean 1-page PDF (no browser header/footer).");
+                    const cv = this.cvPanelJob && this.cvPanelJob.tailored_cv;
+                    if (!cv) return;
+                    if (!window.jspdf || !window.jspdf.jsPDF) {
+                        this.$dispatch('toast', 'PDF engine not loaded (offline?). Ask the assistant to run export_cv_to_pdf.');
+                        return;
+                    }
+                    const { jsPDF } = window.jspdf;
+                    const doc = new jsPDF({ unit: 'pt', format: 'letter' });
+                    const W = doc.internal.pageSize.getWidth();   // 612
+                    const H = doc.internal.pageSize.getHeight();  // 792
+                    const M = 40;
+                    const RIGHT = W - M;
+                    let y = M;
+                    const ensure = (need) => { if (y + need > H - M) { doc.addPage(); y = M; } };
+                    const section = (title) => {
+                        ensure(22);
+                        doc.setFont('times', 'bold'); doc.setFontSize(11);
+                        doc.text(title.toUpperCase(), M, y);
+                        doc.setDrawColor(0); doc.setLineWidth(0.6);
+                        doc.line(M, y + 2, RIGHT, y + 2);
+                        y += 15;
+                    };
+                    const wrap = (text, size, opts = {}) => {
+                        doc.setFont('times', opts.italic ? 'italic' : (opts.bold ? 'bold' : 'normal'));
+                        doc.setFontSize(size);
+                        const lh = size * 1.25;
+                        const lines = doc.splitTextToSize(String(text ?? ''), RIGHT - M);
+                        ensure(lines.length * lh);
+                        doc.text(lines, M, y);
+                        y += lines.length * lh;
+                    };
+
+                    // Name + contact
+                    doc.setFont('times', 'bold'); doc.setFontSize(18);
+                    doc.text((cv.name || '').toUpperCase(), W / 2, y, { align: 'center' });
+                    y += 18;
+                    doc.setFont('times', 'normal'); doc.setFontSize(8.5);
+                    doc.text((cv.contact || []).join('  |  '), W / 2, y, { align: 'center' });
+                    y += 12;
+
+                    section('Summary');
+                    wrap(cv.summary, 9.5);
+
+                    section('Experience');
+                    (cv.experience || []).forEach(job => {
+                        ensure(18);
+                        doc.setFont('times', 'bold'); doc.setFontSize(10);
+                        doc.text(String(job.company || ''), M, y);
+                        const meta = [job.location, job.date].filter(Boolean).join(' · ');
+                        doc.setFont('times', 'italic'); doc.setFontSize(9.5);
+                        doc.text(String(job.title || ''), M, y + 12);
+                        if (meta) { doc.setFont('times', 'normal'); doc.setFontSize(8.5); doc.text(meta, RIGHT, y + 12, { align: 'right' }); }
+                        y += 19;
+                        (job.bullets || []).forEach(b => {
+                            const t = typeof b === 'string' ? b : (b.text || '');
+                            doc.setFont('times', 'normal'); doc.setFontSize(9.5);
+                            const lh = 11;
+                            const lines = doc.splitTextToSize('•  ' + t, RIGHT - M - 8);
+                            ensure(lines.length * lh);
+                            doc.text(lines, M + 8, y);
+                            y += lines.length * lh;
+                        });
+                        y += 4;
+                    });
+
+                    if ((cv.education || []).length) {
+                        section('Education');
+                        (cv.education || []).forEach(e => {
+                            ensure(14);
+                            doc.setFont('times', 'bold'); doc.setFontSize(9.5);
+                            doc.text(String(e.degree || ''), M, y);
+                            if (e.year) { doc.setFont('times', 'normal'); doc.setFontSize(8.5); doc.text(String(e.year), RIGHT, y, { align: 'right' }); }
+                            if (e.institution) { doc.setFont('times', 'normal'); doc.setFontSize(9); doc.text(String(e.institution), M, y + 11); }
+                            y += e.institution ? 19 : 12;
+                        });
+                    }
+
+                    if (Object.keys(cv.skills || {}).length) {
+                        section('Skills');
+                        Object.entries(cv.skills || {}).forEach(([g, items]) => {
+                            wrap(`${g}: ${(items || []).join(', ')}`, 9.5);
+                        });
+                    }
+
+                    doc.save((cv.name || 'CV').replace(/\s+/g, '_') + '_CV.pdf');
                 },
                 startCvResize(e) {
                     e.preventDefault();
