@@ -85,17 +85,23 @@
         .bullet.highlighted:hover .tooltip { display: block; }
 
         /* Job description (markdown) */
-        .prose-desc { line-height: 1.65; font-size: 0.875rem; color: #cbd5e1; }
-        .prose-desc p { margin: 0 0 0.65rem; }
-        .prose-desc ul { list-style: disc; padding-left: 1.25rem; margin: 0 0 0.65rem; }
-        .prose-desc ol { list-style: decimal; padding-left: 1.25rem; margin: 0 0 0.65rem; }
-        .prose-desc li { margin-bottom: 0.3rem; }
-        .prose-desc h3, .prose-desc h4, .prose-desc h5, .prose-desc h6 { font-weight: 600; color: #e2e8f0; margin: 0.9rem 0 0.4rem; }
+        .prose-desc { line-height: 1.75; font-size: 0.95rem; color: #cbd5e1; }
+        .prose-desc p { margin: 0 0 0.8rem; }
+        .prose-desc ul { list-style: disc; padding-left: 1.4rem; margin: 0 0 0.9rem; }
+        .prose-desc ol { list-style: decimal; padding-left: 1.4rem; margin: 0 0 0.9rem; }
+        .prose-desc li { margin-bottom: 0.4rem; }
+        .prose-desc li::marker { color: #64748b; }
+        .prose-desc h3, .prose-desc h4, .prose-desc h5, .prose-desc h6 {
+            font-size: 0.78rem; text-transform: uppercase; letter-spacing: 0.05em;
+            color: #94a3b8; font-weight: 700; border-bottom: 1px solid #1e293b;
+            padding-bottom: 0.3rem; margin: 1.2rem 0 0.6rem;
+        }
+        .prose-desc h3:first-child, .prose-desc h4:first-child, .prose-desc h5:first-child { margin-top: 0; }
         .prose-desc strong { color: #f1f5f9; font-weight: 600; }
-        .prose-desc em { font-style: italic; }
+        .prose-desc em { font-style: italic; color: #e2e8f0; }
         .prose-desc code { background: #0f172a; border: 1px solid #1e293b; padding: 0.05rem 0.3rem; border-radius: 4px; font-size: 0.82em; }
         .prose-desc a { color: #818cf8; text-decoration: underline; }
-        .prose-desc hr { border-color: #1e293b; margin: 0.8rem 0; }
+        .prose-desc hr { border-color: #1e293b; margin: 1rem 0; }
 
         /* Print: only the CV paper is printed (browser "Save as PDF") */
         @page { size: Letter; margin: 0.5in; }
@@ -631,7 +637,7 @@
                                     <!-- Description -->
                                     <div class="border-t border-slate-800 pt-4">
                                         <h4 class="text-xs font-bold uppercase tracking-wider text-slate-500 mb-2">Description</h4>
-                                        <div class="prose-desc max-h-[34rem] overflow-y-auto overscroll-contain bg-slate-950/40 border border-slate-900 rounded-lg p-5" x-html="formatDescription(job.description)"></div>
+                                        <div class="prose-desc max-h-[48rem] overflow-y-auto overscroll-contain bg-slate-950/40 border border-slate-900 rounded-lg p-6" x-html="formatDescription(job.description)"></div>
                                     </div>
 
                                 </div>
@@ -1384,6 +1390,9 @@
                             closeList();
                             const level = Math.min(m[1].length + 2, 6);
                             html += `<h${level}>${inline(m[2])}</h${level}>`;
+                        } else if (line.trim().length <= 60 && /^[A-Z][A-Z0-9 &/,'()\-]{2,}$/.test(line.trim())) {
+                            closeList();
+                            html += `<h4>${inline(line.trim())}</h4>`;
                         } else if ((m = line.match(/^\s*[-*•]\s+(.*)$/))) {
                             if (listType !== 'ul') { closeList(); html += '<ul>'; listType = 'ul'; }
                             html += `<li>${inline(m[1])}</li>`;
